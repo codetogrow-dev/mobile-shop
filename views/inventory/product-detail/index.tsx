@@ -18,6 +18,8 @@ import { ThemedText } from '@/components/themed-text';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
+import { fmtCurrency, fmtPct } from '@/lib/format-num';
+import { StatInfoModal } from '@/components/ui/stat-info-modal';
 import { QK } from '@/constants/query-keys';
 import { getProduct, softDeleteProduct } from '@/api/products';
 import { listPurchases } from '@/api/purchases';
@@ -25,14 +27,16 @@ import { listSales } from '@/api/sales';
 import { getProductSummary } from '@/api/reports';
 import { PurchaseCard } from '@/views/purchases/purchase-card';
 import { SaleCard } from '@/views/sales/sale-card';
+import { PRODUCT_TAB } from '@/constants/enums';
 
-type Tab = 'info' | 'purchases' | 'sales';
+type Tab = typeof PRODUCT_TAB[keyof typeof PRODUCT_TAB];
 
 export default function ProductDetailView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<Tab>('info');
+  const [activeTab, setActiveTab] = useState<Tab>(PRODUCT_TAB.INFO);
+  const [infoModal, setInfoModal] = useState<'sold' | 'revenue' | 'profit' | 'margin' | null>(null);
 
   const { data: product, isLoading } = useQuery({
     queryKey: QK.products.detail(id),
@@ -43,19 +47,19 @@ export default function ProductDetailView() {
   const { data: purchases } = useQuery({
     queryKey: QK.purchases.byProduct(id),
     queryFn: () => listPurchases(id),
-    enabled: !!id && activeTab === 'purchases',
+    enabled: !!id && activeTab === PRODUCT_TAB.PURCHASES,
   });
 
   const { data: sales } = useQuery({
     queryKey: QK.sales.byProduct(id),
     queryFn: () => listSales(id),
-    enabled: !!id && activeTab === 'sales',
+    enabled: !!id && activeTab === PRODUCT_TAB.SALES,
   });
 
   const { data: summary } = useQuery({
     queryKey: QK.reports.product(id),
     queryFn: () => getProductSummary(id),
-    enabled: !!id && activeTab === 'info',
+    enabled: !!id && activeTab === PRODUCT_TAB.INFO,
   });
 
   const deleteMutation = useMutation({
@@ -130,7 +134,7 @@ export default function ProductDetailView() {
 
       {/* Tab Bar */}
       <View style={styles.tabBar}>
-        {(['info', 'purchases', 'sales'] as const).map((tab) => (
+        {([PRODUCT_TAB.INFO, PRODUCT_TAB.PURCHASES, PRODUCT_TAB.SALES] as const).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tab, activeTab === tab && styles.tabActive]}
@@ -148,7 +152,7 @@ export default function ProductDetailView() {
       </View>
 
       {/* Content */}
-      {activeTab === 'info' && (
+      {activeTab === PRODUCT_TAB.INFO && (
         <ScrollView contentContainerStyle={styles.content}>
           {/* Stock Summary */}
           <Card>
@@ -210,12 +214,21 @@ export default function ProductDetailView() {
             <Card>
               <ThemedText type="h4" style={styles.sectionTitle}>All-time Performance</ThemedText>
               <View style={styles.statsGrid}>
-                <StatBox label="Total Sold" value={String(summary.total_sold_qty)} />
-                <StatBox label="Revenue" value={`₨${Number(summary.total_sales_revenue).toLocaleString()}`} color={colors.accent} />
-                <StatBox label="Profit" value={`₨${Number(summary.total_gross_profit).toLocaleString()}`} color={Number(summary.total_gross_profit) >= 0 ? colors.success : colors.danger} />
-                <StatBox label="Margin" value={`${Number(summary.profit_margin_pct ?? 0).toFixed(1)}%`} color={colors.info} />
+                <StatBox label="Total Sold" value={String(summary.total_sold_qty)} onPress={() => setInfoModal('sold')} />
+                <StatBox label="Revenue" value={fmtCurrency(Number(summary.total_sales_revenue))} color={colors.accent} onPress={() => setInfoModal('revenue')} />
+                <StatBox label="Profit" value={fmtCurrency(Number(summary.total_gross_profit), true)} color={Number(summary.total_gross_profit) >= 0 ? colors.success : colors.danger} onPress={() => setInfoModal('profit')} />
+                <StatBox label="Margin" value={fmtPct(Number(summary.profit_margin_pct ?? 0))} color={colors.info} onPress={() => setInfoModal('margin')} />
               </View>
             </Card>
+          )}
+
+          {summary && (
+            <>
+              <StatInfoModal visible={infoModal === 'sold'} onClose={() => setInfoModal(null)} label="Total Sold" description="Total units of this product sold across all time." value={summary.total_sold_qty} isCurrency={false} icon="cube-outline" accentColor={colors.textSecondary} accentBg={colors.bgElevated} />
+              <StatInfoModal visible={infoModal === 'revenue'} onClose={() => setInfoModal(null)} label="All-time Revenue" description="Total revenue generated from sales of this product." value={Number(summary.total_sales_revenue)} icon="cash-outline" accentColor={colors.accent} accentBg={colors.primary50} />
+              <StatInfoModal visible={infoModal === 'profit'} onClose={() => setInfoModal(null)} label="All-time Profit" description="Total gross profit earned from this product (revenue minus FIFO cost)." value={Number(summary.total_gross_profit)} icon="trending-up-outline" accentColor={Number(summary.total_gross_profit) >= 0 ? colors.success : colors.danger} accentBg={Number(summary.total_gross_profit) >= 0 ? colors.successBg : colors.dangerBg} />
+              <StatInfoModal visible={infoModal === 'margin'} onClose={() => setInfoModal(null)} label="Profit Margin" description="Overall profit margin for this product (gross profit ÷ revenue × 100)." value={Number(summary.profit_margin_pct ?? 0)} isCurrency={false} icon="pie-chart-outline" accentColor={colors.info} accentBg={colors.infoBg} />
+            </>
           )}
 
           {/* Actions */}
@@ -240,7 +253,7 @@ export default function ProductDetailView() {
         </ScrollView>
       )}
 
-      {activeTab === 'purchases' && (
+      {activeTab === PRODUCT_TAB.PURCHASES && (
         <FlashList
           data={purchases ?? []}
           keyExtractor={(item) => item.id}
@@ -256,7 +269,7 @@ export default function ProductDetailView() {
         />
       )}
 
-      {activeTab === 'sales' && (
+      {activeTab === PRODUCT_TAB.SALES && (
         <FlashList
           data={sales ?? []}
           keyExtractor={(item) => item.id}
@@ -289,12 +302,12 @@ function InfoRow({ label, value, icon }: { label: string; value: string; icon?: 
   );
 }
 
-function StatBox({ label, value, color }: { label: string; value: string; color?: string }) {
+function StatBox({ label, value, color, onPress }: { label: string; value: string; color?: string; onPress?: () => void }) {
   return (
-    <View style={styles.statBox}>
-      <ThemedText type="numeric" color={color ?? colors.textPrimary}>{value}</ThemedText>
+    <TouchableOpacity style={styles.statBox} onPress={onPress} activeOpacity={onPress ? 0.75 : 1}>
+      <ThemedText type="numeric" color={color ?? colors.textPrimary} numberOfLines={1}>{value}</ThemedText>
       <ThemedText type="caption" color={colors.textTertiary}>{label}</ThemedText>
-    </View>
+    </TouchableOpacity>
   );
 }
 

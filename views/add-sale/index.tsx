@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
+import { fmtCurrency } from '@/lib/format-num';
 import { saleSchema, type SaleFormValues } from '@/types/app';
 import { createSale } from '@/api/sales';
 import { listProducts } from '@/api/products';
@@ -177,7 +178,7 @@ export default function AddSaleView() {
             {total > 0 && (
               <View style={styles.totalRow}>
                 <ThemedText type="body" color={colors.textSecondary}>Total Amount</ThemedText>
-                <ThemedText type="numeric" color={colors.accent}>₨{total.toLocaleString()}</ThemedText>
+                <ThemedText type="numeric" color={colors.accent}>{fmtCurrency(total)}</ThemedText>
               </View>
             )}
           </Card>

@@ -2,11 +2,12 @@ import { colors, radius, spacing } from "@/constants/theme";
 import { Pressable, PressableProps, StyleSheet, ViewStyle } from "react-native";
 import { ThemedText } from "../themed-text";
 
-export type ButtonVariant = "primary" | "secondary" | "tertiary" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "tertiary" | "danger" | "outline";
 export type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends Omit<PressableProps, "style"> {
-  label: string;
+  label?: string;
+  title?: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
   fullWidth?: boolean;
@@ -20,21 +21,31 @@ const variantStyles = {
     backgroundColor: colors.primary500,
     pressedColor: colors.primary600,
     textColor: colors.textInverse,
+    borderColor: 'transparent',
   },
   secondary: {
     backgroundColor: colors.bgElevated,
     pressedColor: colors.primary50,
     textColor: colors.primary500,
+    borderColor: 'transparent',
   },
   tertiary: {
     backgroundColor: "transparent",
     pressedColor: colors.bgElevated,
     textColor: colors.primary500,
+    borderColor: 'transparent',
   },
   danger: {
     backgroundColor: colors.danger,
     pressedColor: "#e63946",
     textColor: colors.textInverse,
+    borderColor: 'transparent',
+  },
+  outline: {
+    backgroundColor: "transparent",
+    pressedColor: colors.bgElevated,
+    textColor: colors.primary500,
+    borderColor: colors.primary300,
   },
 };
 
@@ -58,6 +69,7 @@ const sizeStyles = {
 
 export function Button({
   label,
+  title,
   variant = "primary",
   size = "md",
   fullWidth = false,
@@ -68,6 +80,7 @@ export function Button({
 }: ButtonProps) {
   const variantStyle = variantStyles[variant];
   const sizeStyle = sizeStyles[size];
+  const text = title ?? label ?? '';
 
   return (
     <Pressable
@@ -80,6 +93,8 @@ export function Button({
             pressed && !disabled
               ? variantStyle.pressedColor
               : variantStyle.backgroundColor,
+          borderColor: variantStyle.borderColor,
+          borderWidth: variant === 'outline' ? 1.5 : 0,
           paddingVertical: sizeStyle.paddingVertical,
           paddingHorizontal: sizeStyle.paddingHorizontal,
           width: fullWidth ? "100%" : "auto",
@@ -89,11 +104,11 @@ export function Button({
       ]}
     >
       <ThemedText
-        type="bodySm"
+        type="body"
         color={disabled ? colors.textTertiary : variantStyle.textColor}
         style={{ fontWeight: "600", fontSize: sizeStyle.fontSize }}
       >
-        {loading ? "Loading..." : label}
+        {loading ? "Loading..." : text}
       </ThemedText>
     </Pressable>
   );

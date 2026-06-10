@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export interface KPIData {
   label: string;
@@ -10,6 +10,7 @@ export interface KPIData {
   trend?: 'up' | 'down' | 'neutral';
   icon?: React.ReactNode;
   iconBg?: string;
+  onPress?: () => void;
 }
 
 interface KPIRowProps {
@@ -20,7 +21,7 @@ export function KPIRow({ items }: KPIRowProps) {
   return (
     <View style={styles.grid}>
       {items.map((item, index) => (
-        <View key={index} style={styles.card}>
+        <TouchableOpacity key={index} style={styles.card} onPress={item.onPress} activeOpacity={item.onPress ? 0.75 : 1}>
           <View style={styles.topRow}>
             {item.icon && <View style={[styles.iconBox, item.iconBg ? { backgroundColor: item.iconBg } : {}]}>{item.icon}</View>}
             {item.trend && item.trend !== 'neutral' && (
@@ -46,7 +47,7 @@ export function KPIRow({ items }: KPIRowProps) {
               {item.trend === 'up' ? '↑ ' : item.trend === 'down' ? '↓ ' : ''}{item.change}
             </ThemedText>
           )}
-        </View>
+        </TouchableOpacity>
       ))}
     </View>
   );

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -7,8 +8,14 @@ import { format } from 'date-fns';
 
 import { ThemedText } from '@/components/themed-text';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
+import { fmtCurrency, fmtPct } from '@/lib/format-num';
+import { StatInfoModal } from '@/components/ui/stat-info-modal';
 import { QK } from '@/constants/query-keys';
-import { getDailySummary, getTopProducts, getWeeklyRevenue, getLowStockCount } from '@/api/reports';
+import { STOCK_FILTER } from '@/constants/enums';
+import {
+  getDailySummary, getTopProducts, getWeeklyRevenue,
+  getOutOfStockCount, getMonthToDateSummary, getYesterdaySummary,
+} from '@/api/reports';
 import { listProducts } from '@/api/products';
 import { KPIRow } from './kpi-row';
 import { LowStockList } from './low-stock-list';
@@ -43,22 +50,53 @@ export default function DashboardView() {
 
   const { data: lowStockProducts, refetch: refetchLow } = useQuery({
     queryKey: QK.products.lowStock,
-    queryFn: () => listProducts({ stockFilter: 'low' }),
+    queryFn: () => listProducts({ stockFilter: STOCK_FILTER.LOW }),
   });
 
-  const { data: lowStockCount } = useQuery({
-    queryKey: ['low-stock-count'],
-    queryFn: getLowStockCount,
+  const lowStockCount = lowStockProducts?.length ?? 0;
+
+  const { data: outOfStockCount } = useQuery({
+    queryKey: QK.reports.outOfStockCount,
+    queryFn: getOutOfStockCount,
+  });
+
+  const { data: mtd, refetch: refetchMtd } = useQuery({
+    queryKey: QK.reports.monthToDate,
+    queryFn: getMonthToDateSummary,
+  });
+
+  const { data: yesterday, refetch: refetchYesterday } = useQuery({
+    queryKey: QK.reports.yesterday,
+    queryFn: getYesterdaySummary,
   });
 
   const handleRefresh = () => {
     refetchDaily();
     refetchWeekly();
     refetchLow();
+    refetchMtd();
+    refetchYesterday();
   };
 
   const sparklineData = weeklyRevenue?.map((d) => d.revenue) ?? [];
   const weekTotal = weeklyRevenue?.reduce((s, d) => s + d.revenue, 0) ?? 0;
+
+  const dailyRevenue = Number(daily?.total_revenue ?? 0);
+  const dailyProfit = Number(daily?.gross_profit ?? 0);
+  const dailyMargin = dailyRevenue > 0 ? (dailyProfit / dailyRevenue) * 100 : 0;
+
+  const yesterdayRevenue = yesterday?.revenue ?? 0;
+  const revVsYesterday = yesterdayRevenue > 0
+    ? ((dailyRevenue - yesterdayRevenue) / yesterdayRevenue) * 100
+    : null;
+
+  const mtdRevenue = mtd?.revenue ?? 0;
+  const mtdProfit = mtd?.profit ?? 0;
+  const mtdUnits = mtd?.units_sold ?? 0;
+  const mtdActiveDays = mtd?.active_days ?? 0;
+
+  type InfoModalKey = 'revenue' | 'profit' | 'txn' | 'lowstock' | 'outofstock' | 'margin' | 'mtd_revenue' | 'mtd_profit' | 'mtd_units' | 'yesterday';
+  const [infoModal, setInfoModal] = useState<InfoModalKey | null>(null);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -82,43 +120,128 @@ export default function DashboardView() {
           <RefreshControl refreshing={dailyLoading} onRefresh={handleRefresh} tintColor={colors.primary500} />
         }
       >
-        {/* KPI Cards — 2 per row */}
+        {/* ── Today KPIs ── */}
+        <ThemedText type="h4" style={styles.sectionLabel}>Today</ThemedText>
         <KPIRow
           items={[
             {
-              label: "Today's Revenue",
-              value: `₨${Number(daily?.total_revenue ?? 0).toLocaleString()}`,
-              trend: (daily?.total_revenue ?? 0) > 0 ? 'up' : 'neutral',
+              label: "Revenue",
+              value: fmtCurrency(dailyRevenue),
+              change: revVsYesterday !== null ? `${revVsYesterday >= 0 ? '+' : ''}${revVsYesterday.toFixed(0)}% vs yesterday` : undefined,
+              trend: dailyRevenue > 0 ? 'up' : 'neutral',
               icon: <Ionicons name="cash-outline" size={18} color={colors.primary500} />,
               iconBg: colors.primary50,
+              onPress: () => setInfoModal('revenue'),
             },
             {
-              label: "Today's Profit",
-              value: `₨${Number(daily?.gross_profit ?? 0).toLocaleString()}`,
-              trend: (daily?.gross_profit ?? 0) > 0 ? 'up' : (daily?.gross_profit ?? 0) < 0 ? 'down' : 'neutral',
+              label: "Profit",
+              value: fmtCurrency(dailyProfit, true),
+              trend: dailyProfit > 0 ? 'up' : dailyProfit < 0 ? 'down' : 'neutral',
               icon: <Ionicons name="trending-up-outline" size={18} color={colors.success} />,
               iconBg: colors.successBg,
+              onPress: () => setInfoModal('profit'),
             },
           ]}
         />
         <KPIRow
           items={[
+            {
+              label: 'Margin',
+              value: fmtPct(dailyMargin),
+              trend: dailyMargin >= 20 ? 'up' : dailyMargin > 0 ? 'neutral' : 'down',
+              icon: <Ionicons name="pie-chart-outline" size={18} color={colors.accent} />,
+              iconBg: colors.primary50,
+              onPress: () => setInfoModal('margin'),
+            },
             {
               label: 'Transactions',
               value: String(daily?.transaction_count ?? 0),
               trend: 'neutral',
               icon: <Ionicons name="bag-check-outline" size={18} color={colors.info} />,
               iconBg: colors.infoBg,
+              onPress: () => setInfoModal('txn'),
             },
+          ]}
+        />
+
+        {/* ── Month to Date KPIs ── */}
+        <ThemedText type="h4" style={styles.sectionLabel}>This Month</ThemedText>
+        <KPIRow
+          items={[
+            {
+              label: 'MTD Revenue',
+              value: fmtCurrency(mtdRevenue),
+              change: `${mtdActiveDays} active day${mtdActiveDays !== 1 ? 's' : ''}`,
+              trend: mtdRevenue > 0 ? 'up' : 'neutral',
+              icon: <Ionicons name="calendar-outline" size={18} color={colors.primary500} />,
+              iconBg: colors.primary50,
+              onPress: () => setInfoModal('mtd_revenue'),
+            },
+            {
+              label: 'MTD Profit',
+              value: fmtCurrency(mtdProfit, true),
+              trend: mtdProfit > 0 ? 'up' : mtdProfit < 0 ? 'down' : 'neutral',
+              icon: <Ionicons name="stats-chart-outline" size={18} color={colors.success} />,
+              iconBg: colors.successBg,
+              onPress: () => setInfoModal('mtd_profit'),
+            },
+          ]}
+        />
+        <KPIRow
+          items={[
+            {
+              label: 'Units Sold (MTD)',
+              value: String(mtdUnits),
+              trend: mtdUnits > 0 ? 'up' : 'neutral',
+              icon: <Ionicons name="cube-outline" size={18} color={colors.accent} />,
+              iconBg: colors.primary50,
+              onPress: () => setInfoModal('mtd_units'),
+            },
+            {
+              label: 'Yesterday Revenue',
+              value: fmtCurrency(yesterdayRevenue),
+              trend: 'neutral',
+              icon: <Ionicons name="time-outline" size={18} color={colors.info} />,
+              iconBg: colors.infoBg,
+              onPress: () => setInfoModal('yesterday'),
+            },
+          ]}
+        />
+
+        {/* ── Inventory KPIs ── */}
+        <ThemedText type="h4" style={styles.sectionLabel}>Inventory</ThemedText>
+        <KPIRow
+          items={[
             {
               label: 'Low Stock Items',
               value: String(lowStockCount ?? 0),
               trend: (lowStockCount ?? 0) > 0 ? 'down' : 'neutral',
               icon: <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />,
               iconBg: colors.warningBg,
+              onPress: () => setInfoModal('lowstock'),
+            },
+            {
+              label: 'Out of Stock',
+              value: String(outOfStockCount ?? 0),
+              trend: (outOfStockCount ?? 0) > 0 ? 'down' : 'neutral',
+              icon: <Ionicons name="close-circle-outline" size={18} color={colors.danger} />,
+              iconBg: colors.dangerBg,
+              onPress: () => setInfoModal('outofstock'),
             },
           ]}
         />
+
+        {/* ── Modals ── */}
+        <StatInfoModal visible={infoModal === 'revenue'} onClose={() => setInfoModal(null)} label="Today's Revenue" description="Total money collected from all sales recorded today." value={dailyRevenue} icon="cash-outline" accentColor={colors.primary500} accentBg={colors.primary50} />
+        <StatInfoModal visible={infoModal === 'profit'} onClose={() => setInfoModal(null)} label="Today's Profit" description="Gross profit for today — revenue minus cost of goods (FIFO)." value={dailyProfit} icon="trending-up-outline" accentColor={dailyProfit >= 0 ? colors.success : colors.danger} accentBg={dailyProfit >= 0 ? colors.successBg : colors.dangerBg} />
+        <StatInfoModal visible={infoModal === 'margin'} onClose={() => setInfoModal(null)} label="Today's Margin" description="Gross profit as a percentage of today's revenue. A healthy retail margin is typically 20–40%." value={dailyMargin} isCurrency={false} icon="pie-chart-outline" accentColor={colors.accent} accentBg={colors.primary50} />
+        <StatInfoModal visible={infoModal === 'txn'} onClose={() => setInfoModal(null)} label="Transactions Today" description="Number of individual sale transactions recorded today." value={daily?.transaction_count ?? 0} isCurrency={false} icon="bag-check-outline" accentColor={colors.info} accentBg={colors.infoBg} />
+        <StatInfoModal visible={infoModal === 'mtd_revenue'} onClose={() => setInfoModal(null)} label="Month-to-Date Revenue" description={`Total revenue earned so far this month across ${mtdActiveDays} selling day${mtdActiveDays !== 1 ? 's' : ''}.`} value={mtdRevenue} icon="calendar-outline" accentColor={colors.primary500} accentBg={colors.primary50} />
+        <StatInfoModal visible={infoModal === 'mtd_profit'} onClose={() => setInfoModal(null)} label="Month-to-Date Profit" description="Gross profit earned so far this month (revenue minus FIFO cost of goods sold)." value={mtdProfit} icon="stats-chart-outline" accentColor={mtdProfit >= 0 ? colors.success : colors.danger} accentBg={mtdProfit >= 0 ? colors.successBg : colors.dangerBg} />
+        <StatInfoModal visible={infoModal === 'mtd_units'} onClose={() => setInfoModal(null)} label="Units Sold This Month" description="Total individual product units sold so far this month." value={mtdUnits} isCurrency={false} icon="cube-outline" accentColor={colors.accent} accentBg={colors.primary50} />
+        <StatInfoModal visible={infoModal === 'yesterday'} onClose={() => setInfoModal(null)} label="Yesterday's Revenue" description="Total revenue from all sales recorded yesterday. Compare with today to spot trends." value={yesterdayRevenue} icon="time-outline" accentColor={colors.info} accentBg={colors.infoBg} />
+        <StatInfoModal visible={infoModal === 'lowstock'} onClose={() => setInfoModal(null)} label="Low Stock Items" description="Products whose current stock is at or below their reorder point. Restock soon." value={lowStockCount ?? 0} isCurrency={false} icon="alert-circle-outline" accentColor={colors.warning} accentBg={colors.warningBg} />
+        <StatInfoModal visible={infoModal === 'outofstock'} onClose={() => setInfoModal(null)} label="Out of Stock" description="Products with zero remaining stock. These cannot be sold until restocked." value={outOfStockCount ?? 0} isCurrency={false} icon="close-circle-outline" accentColor={colors.danger} accentBg={colors.dangerBg} />
 
         {/* Quick Actions — 2x2 grid */}
         <View>
@@ -146,7 +269,7 @@ export default function DashboardView() {
         {sparklineData.length > 0 && (
           <SparklineCard
             title="7-Day Revenue"
-            value={`₨${weekTotal.toLocaleString()}`}
+            value={fmtCurrency(weekTotal)}
             data={sparklineData}
             trend={sparklineData[sparklineData.length - 1] >= sparklineData[0] ? 'up' : 'down'}
             change={`${Math.abs(Math.round(((sparklineData[sparklineData.length - 1] - sparklineData[0]) / Math.max(sparklineData[0], 1)) * 100))}%`}
@@ -170,7 +293,7 @@ export default function DashboardView() {
                   </View>
                   <ThemedText type="body" style={styles.topName} numberOfLines={1}>{p.name}</ThemedText>
                   <ThemedText type="caption" color={colors.textTertiary}>{p.units_sold} sold</ThemedText>
-                  <ThemedText type="numericSm" color={colors.accent}>₨{p.revenue.toLocaleString()}</ThemedText>
+                  <ThemedText type="numericSm" color={colors.accent}>{fmtCurrency(p.revenue)}</ThemedText>
                 </View>
               ))}
             </View>
@@ -182,10 +305,10 @@ export default function DashboardView() {
           items={
             lowStockProducts?.map((p) => ({
               id: p.id,
-              name: p.name,
-              current_stock: p.current_stock,
-              reorder_point: p.reorder_point,
-              sku: p.sku ?? '',
+              name: String(p.name),
+              current_stock: Number(p.current_stock),
+              reorder_point: Number(p.reorder_point),
+              sku: typeof p.sku === 'string' ? p.sku : '',
             })) ?? []
           }
         />

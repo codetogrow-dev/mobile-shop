@@ -14,6 +14,7 @@ import { QK } from '@/constants/query-keys';
 import { listCategories } from '@/api/categories';
 import type { ProductFilters, StockFilter, SortBy } from '@/types/app';
 import { DEFAULT_FILTERS } from '@/types/app';
+import { STOCK_FILTER, PRODUCT_SORT } from '@/constants/enums';
 
 interface Props {
   visible: boolean;
@@ -23,16 +24,16 @@ interface Props {
 }
 
 const STOCK_OPTIONS: { label: string; value: StockFilter; icon: string; color: string }[] = [
-  { label: 'All Products',  value: 'all', icon: 'apps-outline',              color: colors.textSecondary },
-  { label: 'In Stock',      value: 'ok',  icon: 'checkmark-circle-outline',  color: colors.success },
-  { label: 'Low Stock',     value: 'low', icon: 'warning-outline',            color: colors.warning },
-  { label: 'Out of Stock',  value: 'out', icon: 'close-circle-outline',       color: colors.danger },
+  { label: 'All Products',  value: STOCK_FILTER.ALL, icon: 'apps-outline',             color: colors.textSecondary },
+  { label: 'In Stock',      value: STOCK_FILTER.OK,  icon: 'checkmark-circle-outline', color: colors.success },
+  { label: 'Low Stock',     value: STOCK_FILTER.LOW, icon: 'warning-outline',           color: colors.warning },
+  { label: 'Out of Stock',  value: STOCK_FILTER.OUT, icon: 'close-circle-outline',      color: colors.danger },
 ];
 
 const SORT_OPTIONS: { label: string; value: SortBy; icon: string }[] = [
-  { label: 'Name (A–Z)',        value: 'name',    icon: 'text-outline' },
-  { label: 'Stock Level',       value: 'stock',   icon: 'cube-outline' },
-  { label: 'Recently Updated',  value: 'updated', icon: 'time-outline' },
+  { label: 'Name (A–Z)',        value: PRODUCT_SORT.NAME,    icon: 'text-outline' },
+  { label: 'Stock Level',       value: PRODUCT_SORT.STOCK,   icon: 'cube-outline' },
+  { label: 'Recently Updated',  value: PRODUCT_SORT.UPDATED, icon: 'time-outline' },
 ];
 
 export function InventoryFilterSheet({ visible, filters, onApply, onClose }: Props) {
@@ -40,6 +41,7 @@ export function InventoryFilterSheet({ visible, filters, onApply, onClose }: Pro
   const [draft, setDraft] = useState<ProductFilters>(filters);
   const [draftParentIds, setDraftParentIds] = useState<string[]>([]);
   const [draftSubIds, setDraftSubIds] = useState<string[]>([]);
+  const [comboOpen, setComboOpen] = useState(false);
 
   const { data: categories } = useQuery({
     queryKey: QK.categories.all,
@@ -140,6 +142,7 @@ export function InventoryFilterSheet({ visible, filters, onApply, onClose }: Pro
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           nestedScrollEnabled
+          scrollEnabled={!comboOpen}
         >
           {/* ── Stock Status ── */}
           <Section title="Stock Status">
@@ -182,10 +185,9 @@ export function InventoryFilterSheet({ visible, filters, onApply, onClose }: Pro
                 );
               }}
               placeholder="All Categories"
-              searchPlaceholder="Search categories…"
               multiple
-              zIndex={3000}
-              zIndexInverse={1000}
+              noBackdrop
+              onOpenChange={setComboOpen}
             />
             {draftParentIds.length > 0 && subItems.length > 0 && (
               <Combobox
@@ -193,10 +195,9 @@ export function InventoryFilterSheet({ visible, filters, onApply, onClose }: Pro
                 selectedIds={draftSubIds}
                 onChangeSelectedIds={setDraftSubIds}
                 placeholder="All Sub-categories"
-                searchPlaceholder="Search sub-categories…"
                 multiple
-                zIndex={2000}
-                zIndexInverse={2000}
+                noBackdrop
+                onOpenChange={setComboOpen}
               />
             )}
           </Section>
@@ -285,9 +286,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export function countActive(f: ProductFilters): number {
   let n = 0;
-  if (f.stockFilter !== 'all') n++;
+  if (f.stockFilter !== STOCK_FILTER.ALL) n++;
   if (f.categoryIds.length > 0) n++;
-  if (f.sortBy !== 'name') n++;
+  if (f.sortBy !== PRODUCT_SORT.NAME) n++;
   if (f.dateFrom || f.dateTo) n++;
   return n;
 }

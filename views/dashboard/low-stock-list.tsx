@@ -32,22 +32,24 @@ export function LowStockList({ items }: LowStockListProps) {
               color={isLowStock ? colors.danger : colors.warning}
             />
             <View style={styles.productInfo}>
-              <ThemedText type="body" style={{ fontWeight: "600" }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }} numberOfLines={1}>
                 {item.name}
               </ThemedText>
-              <ThemedText type="caption" color={colors.textTertiary}>
-                SKU: {item.sku}
-              </ThemedText>
+              {typeof item.sku === 'string' && item.sku.length > 0 && (
+                <ThemedText type="caption" color={colors.textTertiary}>
+                  SKU: {item.sku}
+                </ThemedText>
+              )}
             </View>
           </View>
 
           <View style={styles.rightSection}>
             <View style={styles.stockInfo}>
               <ThemedText type="numeric" color={colors.accent}>
-                {item.current_stock}
+                {Number(item.current_stock)}
               </ThemedText>
               <ThemedText type="caption" color={colors.textTertiary}>
-                / {item.reorder_point}
+                / {Number(item.reorder_point)}
               </ThemedText>
             </View>
             <Badge

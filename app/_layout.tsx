@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -23,6 +23,8 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const setSession = useAuthStore((s) => s.setSession);
   const setLoading = useAuthStore((s) => s.setLoading);
+  const session = useAuthStore((s) => s.session);
+  const isLoading = useAuthStore((s) => s.isLoading);
 
   const [fontsLoaded] = useFonts({
     Montserrat_300Light,
@@ -52,7 +54,17 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) return null;
+  // Route based on session once both fonts and session are ready
+  useEffect(() => {
+    if (!fontsLoaded || isLoading) return;
+    if (session) {
+      router.replace('/(app)/(tabs)/dashboard');
+    } else {
+      router.replace('/(auth)/login');
+    }
+  }, [fontsLoaded, isLoading, session]);
+
+  if (!fontsLoaded || isLoading) return null;
 
   return (
     <QueryClientProvider client={queryClient}>

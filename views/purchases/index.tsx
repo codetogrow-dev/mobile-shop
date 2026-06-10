@@ -12,12 +12,15 @@ import { ThemedText } from '@/components/themed-text';
 import { Combobox } from '@/components/ui/combobox';
 import { TransactionFilterSheet, countTransactionFiltersActive } from '@/components/ui/transaction-filter-sheet';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
+import { fmtCurrency } from '@/lib/format-num';
+import { StatInfoModal } from '@/components/ui/stat-info-modal';
 import { QK } from '@/constants/query-keys';
 import { listPurchases } from '@/api/purchases';
 import { listProductNames } from '@/api/products';
 import { PurchaseCard } from './purchase-card';
 import type { PurchaseFilters } from '@/types/app';
 import { DEFAULT_PURCHASE_FILTERS } from '@/types/app';
+import { TRANSACTION_SORT, TRANSACTION_MODE } from '@/constants/enums';
 
 export default function PurchasesView() {
   const insets = useSafeAreaInsets();
@@ -25,6 +28,7 @@ export default function PurchasesView() {
   // selectedProductId drives the search — single-select combobox
   const [selectedProductId, setSelectedProductId] = useState<string[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [infoModal, setInfoModal] = useState<'batches' | 'invested' | null>(null);
 
   const { data: productNames } = useQuery({
     queryKey: QK.products.names,
@@ -90,16 +94,53 @@ export default function PurchasesView() {
 
       {/* Summary */}
       <View style={styles.summaryRow}>
-        <View style={styles.summaryCard}>
-          <ThemedText type="caption" color={colors.textSecondary}>Total Batches</ThemedText>
-          <ThemedText type="numeric" color={colors.textPrimary}>{totalBatches}</ThemedText>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.summaryCard}>
-          <ThemedText type="caption" color={colors.textSecondary}>Total Invested</ThemedText>
-          <ThemedText type="numeric" color={colors.info}>₨{totalSpent.toLocaleString()}</ThemedText>
-        </View>
+        <TouchableOpacity
+          style={[styles.summaryCard, { borderLeftWidth: 3, borderLeftColor: colors.textTertiary }]}
+          onPress={() => setInfoModal('batches')} activeOpacity={0.75}
+        >
+          <View style={styles.summaryIconRow}>
+            <View style={[styles.summaryIcon, { backgroundColor: colors.bgElevated }]}>
+              <Ionicons name="layers-outline" size={14} color={colors.textSecondary} />
+            </View>
+            <ThemedText type="overline" color={colors.textTertiary}>BATCHES</ThemedText>
+          </View>
+          <ThemedText type="h4" color={colors.textPrimary} numberOfLines={1}>{totalBatches}</ThemedText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.summaryCard, { borderLeftWidth: 3, borderLeftColor: colors.info }]}
+          onPress={() => setInfoModal('invested')} activeOpacity={0.75}
+        >
+          <View style={styles.summaryIconRow}>
+            <View style={[styles.summaryIcon, { backgroundColor: colors.infoBg }]}>
+              <Ionicons name="wallet-outline" size={14} color={colors.info} />
+            </View>
+            <ThemedText type="overline" color={colors.textTertiary}>INVESTED</ThemedText>
+          </View>
+          <ThemedText type="h4" color={colors.info} numberOfLines={1}>{fmtCurrency(totalSpent)}</ThemedText>
+        </TouchableOpacity>
       </View>
+
+      <StatInfoModal
+        visible={infoModal === 'batches'}
+        onClose={() => setInfoModal(null)}
+        label="Total Batches"
+        description="Number of purchase batches recorded. Each batch represents a single stock replenishment event."
+        value={totalBatches}
+        isCurrency={false}
+        icon="layers-outline"
+        accentColor={colors.textSecondary}
+        accentBg={colors.bgElevated}
+      />
+      <StatInfoModal
+        visible={infoModal === 'invested'}
+        onClose={() => setInfoModal(null)}
+        label="Total Invested"
+        description="Total capital spent on purchasing stock in the current filter period (quantity × cost price per unit)."
+        value={totalSpent}
+        icon="wallet-outline"
+        accentColor={colors.info}
+        accentBg={colors.infoBg}
+      />
 
       {/* Search row lives outside FlashList so dropdown overlays cards */}
       <View style={styles.searchSection}>
@@ -131,7 +172,9 @@ export default function PurchasesView() {
       <FlashList
         data={purchases ?? []}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <PurchaseCard item={item} />}
+        renderItem={({ item }) => (
+          <PurchaseCard item={item} onPress={() => router.push(`/(app)/purchase/${item.id}`)} />
+        )}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary500} />}
@@ -143,8 +186,8 @@ export default function PurchasesView() {
               {(filters.dateFrom || filters.dateTo) ? (
                 <ActiveChip label="Date range" onRemove={() => setFilters((f) => ({ ...f, dateFrom: null, dateTo: null }))} />
               ) : null}
-              {filters.sortBy !== 'date_desc' ? (
-                <ActiveChip label="Sorted" onRemove={() => setFilters((f) => ({ ...f, sortBy: 'date_desc' }))} />
+              {filters.sortBy !== TRANSACTION_SORT.DATE_DESC ? (
+                <ActiveChip label="Sorted" onRemove={() => setFilters((f) => ({ ...f, sortBy: TRANSACTION_SORT.DATE_DESC }))} />
               ) : null}
             </View>
             <TouchableOpacity onPress={handleResetAll} style={styles.resetAllBtn}>
@@ -176,7 +219,7 @@ export default function PurchasesView() {
       </TouchableOpacity>
 
       <TransactionFilterSheet
-        mode="purchases"
+        mode={TRANSACTION_MODE.PURCHASES}
         visible={sheetOpen}
         filters={filters}
         onApply={handleApply}
@@ -223,11 +266,19 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     flexDirection: 'row', marginHorizontal: spacing[5], marginBottom: spacing[4],
-    backgroundColor: colors.bgCard, borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+    gap: spacing[3],
+  },
+  summaryCard: {
+    flex: 1, backgroundColor: colors.bgCard, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[4], gap: spacing[2],
     ...shadows.sm,
   },
-  summaryCard: { flex: 1, alignItems: 'center', paddingVertical: spacing[4], gap: spacing[1] },
-  divider: { width: 1, backgroundColor: colors.border, marginVertical: spacing[3] },
+  summaryIconRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  summaryIcon: {
+    width: 24, height: 24, borderRadius: 6,
+    alignItems: 'center', justifyContent: 'center',
+  },
   list: { paddingHorizontal: spacing[5], paddingBottom: spacing[12] },
   searchSection: {
     paddingHorizontal: spacing[5],

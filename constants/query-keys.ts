@@ -12,12 +12,14 @@ export const QK = {
   },
   sales: {
     all: ['sales'] as const,
+    detail: (id: string) => ['sales', 'detail', id] as const,
     byDate: (from: string, to: string) => ['sales', 'range', from, to] as const,
     byProduct: (productId: string) => ['sales', 'product', productId] as const,
     today: ['sales', 'today'] as const,
   },
   purchases: {
     all: ['purchases'] as const,
+    detail: (id: string) => ['purchases', 'detail', id] as const,
     byProduct: (productId: string) => ['purchases', 'product', productId] as const,
   },
   reports: {
@@ -26,6 +28,10 @@ export const QK = {
     product: (productId: string) => ['reports', 'product', productId] as const,
     weeklyRevenue: ['reports', 'weekly-revenue'] as const,
     topProducts: (date: string) => ['reports', 'top-products', date] as const,
+    yearly: (year: number) => ['reports', 'yearly', year] as const,
+    outOfStockCount: ['reports', 'out-of-stock-count'] as const,
+    monthToDate: ['reports', 'month-to-date'] as const,
+    yesterday: ['reports', 'yesterday'] as const,
   },
   profile: ['profile'] as const,
 } as const;

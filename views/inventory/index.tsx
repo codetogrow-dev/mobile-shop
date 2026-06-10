@@ -17,6 +17,7 @@ import { ProductCard } from './product-card';
 import { InventoryFilterSheet, countActive } from './inventory-filter-sheet';
 import type { ProductFilters } from '@/types/app';
 import { DEFAULT_FILTERS } from '@/types/app';
+import { STOCK_FILTER, PRODUCT_SORT } from '@/constants/enums';
 
 export default function InventoryView() {
   const insets = useSafeAreaInsets();
@@ -109,10 +110,13 @@ export default function InventoryView() {
             {filters.search ? (
               <ActiveChip label={`"${filters.search}"`} onRemove={handleClearSearch} />
             ) : null}
-            {filters.stockFilter !== 'all' ? (
+            {filters.stockFilter !== STOCK_FILTER.ALL ? (
               <ActiveChip
-                label={filters.stockFilter === 'ok' ? 'In Stock' : filters.stockFilter === 'low' ? 'Low Stock' : 'Out of Stock'}
-                onRemove={() => setFilters((f) => ({ ...f, stockFilter: 'all' }))}
+                label={
+                  filters.stockFilter === STOCK_FILTER.OK  ? 'In Stock' :
+                  filters.stockFilter === STOCK_FILTER.LOW ? 'Low Stock' : 'Out of Stock'
+                }
+                onRemove={() => setFilters((f) => ({ ...f, stockFilter: STOCK_FILTER.ALL }))}
               />
             ) : null}
             {filters.categoryIds.length > 0 ? (
@@ -124,8 +128,8 @@ export default function InventoryView() {
             {(filters.dateFrom || filters.dateTo) ? (
               <ActiveChip label="Date range" onRemove={() => setFilters((f) => ({ ...f, dateFrom: null, dateTo: null }))} />
             ) : null}
-            {filters.sortBy !== 'name' ? (
-              <ActiveChip label={`Sort: ${filters.sortBy}`} onRemove={() => setFilters((f) => ({ ...f, sortBy: 'name' }))} />
+            {filters.sortBy !== PRODUCT_SORT.NAME ? (
+              <ActiveChip label={`Sort: ${filters.sortBy}`} onRemove={() => setFilters((f) => ({ ...f, sortBy: PRODUCT_SORT.NAME }))} />
             ) : null}
           </View>
           <TouchableOpacity onPress={handleResetAll} style={styles.resetAllBtn} activeOpacity={0.7}>

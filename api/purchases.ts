@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { PurchaseFormValues, PurchaseFilters } from '@/types/app';
+import { TRANSACTION_SORT } from '@/constants/enums';
 
 export async function createPurchase(values: PurchaseFormValues & { tenant_id: string }) {
   const { data, error } = await supabase.rpc('record_purchase', {
@@ -29,13 +30,46 @@ export async function listPurchases(productId?: string, filters?: Partial<Purcha
   if (filters?.supplier) query = query.ilike('supplier', `%${filters.supplier}%`);
   if (filters?.dateFrom) query = query.gte('purchased_at', filters.dateFrom);
   if (filters?.dateTo) query = query.lte('purchased_at', filters.dateTo + 'T23:59:59');
-  if (filters?.sortBy === 'amount_desc') query = query.order('cost_price', { ascending: false });
-  else if (filters?.sortBy === 'amount_asc') query = query.order('cost_price', { ascending: true });
-  else if (filters?.sortBy === 'qty_desc') query = query.order('quantity', { ascending: false });
+  switch (filters?.sortBy) {
+    case TRANSACTION_SORT.AMOUNT_DESC: query = query.order('cost_price', { ascending: false }); break;
+    case TRANSACTION_SORT.AMOUNT_ASC:  query = query.order('cost_price', { ascending: true });  break;
+    case TRANSACTION_SORT.QTY_DESC:    query = query.order('quantity',   { ascending: false }); break;
+  }
 
   const { data, error } = await query;
   if (error) throw error;
   return data;
+}
+
+export async function getPurchase(id: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('purchase_batches')
+    .select(`*, products(id, name)`)
+    .eq('id', id)
+    .eq('user_id', user?.id)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePurchase(id: string, values: { cost_price: number; selling_price: number; supplier?: string | null; notes?: string | null; purchased_at: string }) {
+  const { data, error } = await supabase
+    .from('purchase_batches')
+    .update(values)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deletePurchase(id: string) {
+  const { error } = await supabase
+    .from('purchase_batches')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
 }
 
 export async function listPurchasesByDateRange(from: string, to: string) {

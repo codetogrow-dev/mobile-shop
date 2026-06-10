@@ -1,8 +1,9 @@
-import { View, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
-import { ThemedText } from '@/components/themed-text';
-import { colors, spacing, radius } from '@/constants/theme';
+import { ThemedText } from "@/components/themed-text";
+import { colors, radius, spacing } from "@/constants/theme";
+import { fmtCurrency } from "@/lib/format-num";
+import { Ionicons } from "@expo/vector-icons";
+import { format } from "date-fns";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 
 export interface SaleCardData {
   id: string;
@@ -17,15 +18,29 @@ export interface SaleCardData {
   products?: { name: string } | null;
 }
 
-export function SaleCard({ item, showProduct = true }: { item: SaleCardData; showProduct?: boolean }) {
+export function SaleCard({
+  item,
+  showProduct = true,
+  onPress,
+}: {
+  item: SaleCardData;
+  showProduct?: boolean;
+  onPress?: () => void;
+}) {
   const revenue = Number(item.total_revenue);
-  const cost = Number(item.total_cost ?? (Number(item.cost_price_per_unit ?? 0) * item.quantity));
+  const cost = Number(
+    item.total_cost ?? Number(item.cost_price_per_unit ?? 0) * item.quantity,
+  );
   const profit = Number(item.gross_profit);
   const isProfit = profit >= 0;
-  const marginPct = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : '0';
+  const marginPct = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0";
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={onPress}
+      activeOpacity={onPress ? 0.75 : 1}
+    >
       {/* Top row: icon + title + date */}
       <View style={styles.topRow}>
         <View style={styles.iconBox}>
@@ -33,16 +48,22 @@ export function SaleCard({ item, showProduct = true }: { item: SaleCardData; sho
         </View>
         <View style={styles.titleBlock}>
           {showProduct && item.products?.name ? (
-            <ThemedText type="h4" numberOfLines={1}>{item.products.name}</ThemedText>
+            <ThemedText type="h4" numberOfLines={1}>
+              {item.products.name}
+            </ThemedText>
           ) : null}
           <ThemedText type="caption" color={colors.textTertiary}>
-            {format(new Date(item.sold_at), 'dd MMM yyyy · hh:mm a')}
+            {format(new Date(item.sold_at), "dd MMM yyyy · hh:mm a")}
           </ThemedText>
         </View>
         {/* Revenue pill */}
         <View style={styles.revenuePill}>
-          <ThemedText type="caption" color={colors.primary500} style={{ fontWeight: '700' }}>
-            ₨{revenue.toLocaleString()}
+          <ThemedText
+            type="caption"
+            color={colors.primary500}
+            style={{ fontWeight: "700" }}
+          >
+            {fmtCurrency(revenue)}
           </ThemedText>
         </View>
       </View>
@@ -55,52 +76,79 @@ export function SaleCard({ item, showProduct = true }: { item: SaleCardData; sho
         <MetricCell label="Qty Sold" value={`${item.quantity} units`} />
         <MetricCell
           label="Sale Price / unit"
-          value={`₨${Number(item.sale_price_per_unit).toLocaleString()}`}
+          value={fmtCurrency(Number(item.sale_price_per_unit))}
         />
         {item.cost_price_per_unit != null && (
           <MetricCell
             label="Cost / unit"
-            value={`₨${Number(item.cost_price_per_unit).toLocaleString()}`}
+            value={fmtCurrency(Number(item.cost_price_per_unit))}
           />
         )}
         {cost > 0 && (
-          <MetricCell label="Total Cost" value={`₨${cost.toLocaleString()}`} />
+          <MetricCell label="Total Cost" value={fmtCurrency(cost)} />
         )}
         <MetricCell
           label="Total Revenue"
-          value={`₨${revenue.toLocaleString()}`}
+          value={fmtCurrency(revenue)}
           valueColor={colors.accent}
         />
         <MetricCell
           label={`Margin (${marginPct}%)`}
-          value={`${isProfit ? '+' : ''}₨${profit.toLocaleString()}`}
+          value={fmtCurrency(profit, true)}
           valueColor={isProfit ? colors.success : colors.danger}
         />
       </View>
 
       {/* Profit banner */}
-      <View style={[styles.profitBanner, { backgroundColor: isProfit ? colors.successBg : colors.dangerBg }]}>
-        <ThemedText type="caption" color={colors.textSecondary}>Gross Profit</ThemedText>
+      <View
+        style={[
+          styles.profitBanner,
+          { backgroundColor: isProfit ? colors.successBg : colors.dangerBg },
+        ]}
+      >
+        <ThemedText type="caption" color={colors.textSecondary}>
+          Gross Profit
+        </ThemedText>
         <ThemedText type="h4" color={isProfit ? colors.success : colors.danger}>
-          {isProfit ? '+' : ''}₨{profit.toLocaleString()}
+          {fmtCurrency(profit, true)}
         </ThemedText>
       </View>
 
       {item.notes ? (
         <View style={styles.notesRow}>
-          <Ionicons name="document-text-outline" size={13} color={colors.textTertiary} />
-          <ThemedText type="caption" color={colors.textSecondary}>{item.notes}</ThemedText>
+          <Ionicons
+            name="document-text-outline"
+            size={13}
+            color={colors.textTertiary}
+          />
+          <ThemedText type="caption" color={colors.textSecondary}>
+            {item.notes}
+          </ThemedText>
         </View>
       ) : null}
-    </View>
+    </TouchableOpacity>
   );
 }
 
-function MetricCell({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+function MetricCell({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string;
+  value: string;
+  valueColor?: string;
+}) {
   return (
     <View style={styles.metricCell}>
-      <ThemedText type="caption" color={colors.textTertiary}>{label}</ThemedText>
-      <ThemedText type="caption" color={valueColor ?? colors.textPrimary} style={styles.metricValue}>
+      <ThemedText type="caption" color={colors.textTertiary}>
+        {label}
+      </ThemedText>
+      <ThemedText
+        type="caption"
+        color={valueColor ?? colors.textPrimary}
+        style={styles.metricValue}
+      >
         {value}
       </ThemedText>
     </View>
@@ -113,11 +161,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
-    overflow: 'hidden',
+    overflow: "hidden",
+    paddingHorizontal: 2,
   },
   topRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: spacing[3],
     padding: spacing[4],
     paddingBottom: spacing[3],
@@ -127,8 +176,8 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: radius.md,
     backgroundColor: colors.primary50,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 2,
   },
   titleBlock: { flex: 1, gap: 3 },
@@ -139,29 +188,33 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.primary200,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
-  divider: { height: 1, backgroundColor: colors.border, marginHorizontal: spacing[4] },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing[4],
+  },
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     padding: spacing[4],
     paddingBottom: spacing[3],
     gap: spacing[1],
   },
   metricCell: {
-    width: '48%',
+    width: "48%",
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[3],
     backgroundColor: colors.bgElevated,
     borderRadius: radius.sm,
     gap: 2,
   },
-  metricValue: { fontWeight: '600' },
+  metricValue: { fontWeight: "600" },
   profitBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginHorizontal: spacing[4],
     marginBottom: spacing[3],
     paddingVertical: spacing[2],
@@ -169,8 +222,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   notesRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: spacing[2],
     paddingHorizontal: spacing[4],
     paddingBottom: spacing[3],

@@ -69,8 +69,10 @@ export type SaleFormValues = z.infer<typeof saleSchema>;
 
 // ─── Filters ─────────────────────────────────────────────────────────────────
 
-export type StockFilter = 'all' | 'low' | 'ok' | 'out';
-export type SortBy = 'name' | 'stock' | 'updated';
+import { STOCK_FILTER, PRODUCT_SORT, TRANSACTION_SORT, DATE_RANGE_MODE } from '@/constants/enums';
+
+export type StockFilter = typeof STOCK_FILTER[keyof typeof STOCK_FILTER];
+export type SortBy = typeof PRODUCT_SORT[keyof typeof PRODUCT_SORT];
 
 export interface ProductFilters {
   search: string;
@@ -84,14 +86,14 @@ export interface ProductFilters {
 export const DEFAULT_FILTERS: ProductFilters = {
   search: '',
   categoryIds: [],
-  stockFilter: 'all',
-  sortBy: 'name',
+  stockFilter: STOCK_FILTER.ALL,
+  sortBy: PRODUCT_SORT.NAME,
   dateFrom: null,
   dateTo: null,
 };
 
-export type SaleSortBy = 'date_desc' | 'amount_desc' | 'amount_asc' | 'qty_desc';
-export type PurchaseSortBy = 'date_desc' | 'amount_desc' | 'amount_asc' | 'qty_desc';
+export type SaleSortBy = typeof TRANSACTION_SORT[keyof typeof TRANSACTION_SORT];
+export type PurchaseSortBy = typeof TRANSACTION_SORT[keyof typeof TRANSACTION_SORT];
 
 export interface SaleFilters {
   productId: string | null;
@@ -112,18 +114,18 @@ export const DEFAULT_SALE_FILTERS: SaleFilters = {
   productId: null,
   dateFrom: null,
   dateTo: null,
-  sortBy: 'date_desc',
+  sortBy: TRANSACTION_SORT.DATE_DESC,
 };
 
 export const DEFAULT_PURCHASE_FILTERS: PurchaseFilters = {
   productId: null,
   dateFrom: null,
   dateTo: null,
-  sortBy: 'date_desc',
+  sortBy: TRANSACTION_SORT.DATE_DESC,
   supplier: '',
 };
 
-export type DateRangeMode = 'today' | 'week' | 'month' | 'custom';
+export type DateRangeMode = typeof DATE_RANGE_MODE[keyof typeof DATE_RANGE_MODE];
 
 export interface DateRange {
   from: string;
@@ -147,7 +149,29 @@ export interface MonthlySummary {
   total_cost: number;
   gross_profit: number;
   transaction_count: number;
+  units_sold: number;
+  avg_sale_value: number;
   daily_breakdown: DailySummary[];
+}
+
+export interface YearlySummary {
+  year: number;
+  total_revenue: number;
+  total_cost: number;
+  gross_profit: number;
+  transaction_count: number;
+  units_sold: number;
+  monthly_breakdown: MonthlyBreakdownRow[];
+}
+
+export interface MonthlyBreakdownRow {
+  year: number;
+  month: number;
+  total_revenue: number;
+  total_cost: number;
+  gross_profit: number;
+  transaction_count: number;
+  units_sold: number;
 }
 
 export interface ProductSummary {

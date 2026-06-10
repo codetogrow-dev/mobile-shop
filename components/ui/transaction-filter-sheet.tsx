@@ -10,11 +10,12 @@ import { DatePickerField } from '@/components/ui/date-picker-field';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
 import type { SaleFilters, PurchaseFilters, SaleSortBy, PurchaseSortBy } from '@/types/app';
 import { DEFAULT_SALE_FILTERS, DEFAULT_PURCHASE_FILTERS } from '@/types/app';
+import { TRANSACTION_SORT, TRANSACTION_MODE } from '@/constants/enums';
 
 // ─── Sales variant ────────────────────────────────────────────────────────────
 
 interface SaleSheetProps {
-  mode: 'sales';
+  mode: typeof TRANSACTION_MODE.SALES;
   visible: boolean;
   filters: SaleFilters;
   onApply: (f: SaleFilters) => void;
@@ -24,7 +25,7 @@ interface SaleSheetProps {
 // ─── Purchases variant ────────────────────────────────────────────────────────
 
 interface PurchaseSheetProps {
-  mode: 'purchases';
+  mode: typeof TRANSACTION_MODE.PURCHASES;
   visible: boolean;
   filters: PurchaseFilters;
   onApply: (f: PurchaseFilters) => void;
@@ -34,23 +35,23 @@ interface PurchaseSheetProps {
 type Props = SaleSheetProps | PurchaseSheetProps;
 
 const SORT_OPTIONS_SALES: { label: string; value: SaleSortBy; icon: string }[] = [
-  { label: 'Date (Newest first)', value: 'date_desc',   icon: 'time-outline' },
-  { label: 'Revenue (High–Low)',  value: 'amount_desc', icon: 'trending-up-outline' },
-  { label: 'Revenue (Low–High)',  value: 'amount_asc',  icon: 'trending-down-outline' },
-  { label: 'Quantity (High–Low)', value: 'qty_desc',    icon: 'cube-outline' },
+  { label: 'Date (Newest first)', value: TRANSACTION_SORT.DATE_DESC,   icon: 'time-outline' },
+  { label: 'Revenue (High–Low)',  value: TRANSACTION_SORT.AMOUNT_DESC, icon: 'trending-up-outline' },
+  { label: 'Revenue (Low–High)',  value: TRANSACTION_SORT.AMOUNT_ASC,  icon: 'trending-down-outline' },
+  { label: 'Quantity (High–Low)', value: TRANSACTION_SORT.QTY_DESC,    icon: 'cube-outline' },
 ];
 
 const SORT_OPTIONS_PURCHASES: { label: string; value: PurchaseSortBy; icon: string }[] = [
-  { label: 'Date (Newest first)', value: 'date_desc',   icon: 'time-outline' },
-  { label: 'Amount (High–Low)',   value: 'amount_desc', icon: 'trending-up-outline' },
-  { label: 'Amount (Low–High)',   value: 'amount_asc',  icon: 'trending-down-outline' },
-  { label: 'Quantity (High–Low)', value: 'qty_desc',    icon: 'cube-outline' },
+  { label: 'Date (Newest first)', value: TRANSACTION_SORT.DATE_DESC,   icon: 'time-outline' },
+  { label: 'Amount (High–Low)',   value: TRANSACTION_SORT.AMOUNT_DESC, icon: 'trending-up-outline' },
+  { label: 'Amount (Low–High)',   value: TRANSACTION_SORT.AMOUNT_ASC,  icon: 'trending-down-outline' },
+  { label: 'Quantity (High–Low)', value: TRANSACTION_SORT.QTY_DESC,    icon: 'cube-outline' },
 ];
 
 export function countTransactionFiltersActive(f: SaleFilters | PurchaseFilters): number {
   let n = 0;
   if (f.dateFrom || f.dateTo) n++;
-  if (f.sortBy !== 'date_desc') n++;
+  if (f.sortBy !== TRANSACTION_SORT.DATE_DESC) n++;
   if ('supplier' in f && f.supplier) n++;
   return n;
 }
@@ -102,7 +103,7 @@ export function TransactionFilterSheet(props: Props) {
         {/* Header */}
         <View style={styles.sheetHeader}>
           <ThemedText type="h3">
-            Filter {mode === 'sales' ? 'Sales' : 'Purchases'}
+            Filter {mode === TRANSACTION_MODE.SALES ? 'Sales' : 'Purchases'}
           </ThemedText>
           <View style={styles.headerActions}>
             {activeCount > 0 && (

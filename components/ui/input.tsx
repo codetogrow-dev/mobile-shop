@@ -36,7 +36,7 @@ export function Input({
     <View style={containerStyle}>
       {label && (
         <ThemedText
-          type="bodySm"
+          type="caption"
           color={colors.textSecondary}
           style={{ marginBottom: spacing[2], fontWeight: '600' }}
         >

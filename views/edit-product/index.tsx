@@ -45,7 +45,7 @@ export default function EditProductView() {
         name: product.name,
         sku: product.sku ?? '',
         barcode: product.barcode ?? '',
-        unit: product.unit,
+        unit: product.unit ?? 'piece',
         description: product.description ?? '',
         reorder_point: product.reorder_point,
         category_id: product.category_id ?? null,
@@ -93,51 +93,99 @@ export default function EditProductView() {
             </View>
           )}
 
+          {/* ── Basic Info ── */}
           <Card>
-            <ThemedText type="h4" style={styles.sectionTitle}>Product Details</ThemedText>
+            <ThemedText type="h4" style={styles.sectionTitle}>Basic Info</ThemedText>
+
             <Controller control={control} name="name" render={({ field }) => (
-              <Input label="Product Name *" value={field.value} onChangeText={field.onChange} error={errors.name?.message} />
+              <Input
+                label="Product Name *"
+                placeholder="e.g. iPhone 15 Back Cover"
+                value={field.value}
+                onChangeText={field.onChange}
+                error={errors.name?.message}
+              />
             )} />
+
             <Controller control={control} name="sku" render={({ field }) => (
-              <Input label="SKU / Code" value={field.value ?? ''} onChangeText={field.onChange} />
+              <Input
+                label="SKU / Item Code"
+                placeholder="Optional — e.g. IP15-COVER-BLK"
+                value={field.value ?? ''}
+                onChangeText={field.onChange}
+                error={errors.sku?.message}
+              />
             )} />
+
             <Controller control={control} name="barcode" render={({ field }) => (
               <Input
                 label="Barcode"
+                placeholder="Scan or type barcode number"
                 value={field.value ?? ''}
                 onChangeText={field.onChange}
                 rightIcon={<Ionicons name="scan-outline" size={18} color={colors.primary500} />}
               />
             )} />
+
+            <Controller control={control} name="description" render={({ field }) => (
+              <Input
+                label="Notes"
+                placeholder="Any extra details about this product"
+                multiline
+                numberOfLines={3}
+                value={field.value ?? ''}
+                onChangeText={field.onChange}
+              />
+            )} />
           </Card>
 
+          {/* ── Category ── */}
           <Card>
             <ThemedText type="h4" style={styles.sectionTitle}>Category</ThemedText>
             <CategoryPicker
               categories={categories ?? []}
               selectedId={selectedCategoryId}
               onSelect={(id) => setValue('category_id', id)}
+              error={errors.category_id?.message}
             />
           </Card>
 
+          {/* ── Stock Settings ── */}
           <Card>
             <ThemedText type="h4" style={styles.sectionTitle}>Stock Settings</ThemedText>
+
             <Controller control={control} name="unit" render={({ field }) => (
-              <Input label="Unit" value={field.value} onChangeText={field.onChange} error={errors.unit?.message} />
+              <Input
+                label="Unit"
+                placeholder="e.g. piece, box, pack, pair"
+                value={field.value}
+                onChangeText={field.onChange}
+                error={errors.unit?.message}
+              />
             )} />
+
             <Controller control={control} name="reorder_point" render={({ field }) => (
               <Input
-                label="Reorder Point"
+                label="Low Stock Warning At"
+                placeholder="e.g. 5 — you'll be alerted when stock hits this"
                 keyboardType="numeric"
                 value={String(field.value ?? '')}
                 onChangeText={field.onChange}
                 error={errors.reorder_point?.message}
+                leftIcon={<Ionicons name="warning-outline" size={18} color={colors.textTertiary} />}
               />
             )} />
-            <Controller control={control} name="description" render={({ field }) => (
-              <Input label="Description" multiline numberOfLines={3} value={field.value ?? ''} onChangeText={field.onChange} />
-            )} />
           </Card>
+
+          {/* ── Current Stock (read-only info) ── */}
+          {product && (
+            <View style={styles.stockNote}>
+              <Ionicons name="information-circle-outline" size={16} color={colors.info} />
+              <ThemedText type="caption" color={colors.textSecondary} style={{ flex: 1 }}>
+                Current stock is <ThemedText type="caption" color={colors.textPrimary}>{product.current_stock} {product.unit ?? 'units'}</ThemedText>. To add more stock use <ThemedText type="caption" color={colors.primary500}>Add Purchase</ThemedText>.
+              </ThemedText>
+            </View>
+          )}
 
           <Button
             label="Save Changes"
@@ -171,10 +219,15 @@ const styles = StyleSheet.create({
     borderRadius: 18, backgroundColor: colors.bgElevated,
   },
   content: { padding: spacing[5], gap: spacing[4], paddingBottom: spacing[10] },
-  sectionTitle: { marginBottom: spacing[3] },
+  sectionTitle: { marginBottom: spacing[1] },
   errorBanner: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: colors.dangerBg, borderRadius: radius.md,
     padding: spacing[3], borderWidth: 1, borderColor: colors.danger,
+  },
+  stockNote: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2],
+    backgroundColor: colors.infoBg, borderRadius: radius.md,
+    padding: spacing[3], borderWidth: 1, borderColor: colors.info + '44',
   },
 });

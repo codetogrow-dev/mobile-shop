@@ -12,18 +12,22 @@ import { ThemedText } from '@/components/themed-text';
 import { Combobox } from '@/components/ui/combobox';
 import { TransactionFilterSheet, countTransactionFiltersActive } from '@/components/ui/transaction-filter-sheet';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
+import { fmtCurrency } from '@/lib/format-num';
+import { StatInfoModal } from '@/components/ui/stat-info-modal';
 import { QK } from '@/constants/query-keys';
 import { listSales } from '@/api/sales';
 import { listProductNames } from '@/api/products';
 import { SaleCard } from './sale-card';
 import type { SaleFilters } from '@/types/app';
 import { DEFAULT_SALE_FILTERS } from '@/types/app';
+import { TRANSACTION_SORT, TRANSACTION_MODE } from '@/constants/enums';
 
 export default function SalesView() {
   const insets = useSafeAreaInsets();
   const [filters, setFilters] = useState<SaleFilters>(DEFAULT_SALE_FILTERS);
   const [selectedProductId, setSelectedProductId] = useState<string[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [infoModal, setInfoModal] = useState<'revenue' | 'profit' | 'txn' | null>(null);
 
   const { data: productNames } = useQuery({
     queryKey: QK.products.names,
@@ -86,23 +90,77 @@ export default function SalesView() {
 
       {/* Summary */}
       <View style={styles.summaryRow}>
-        <View style={styles.summaryCard}>
-          <ThemedText type="caption" color={colors.textSecondary}>Revenue</ThemedText>
-          <ThemedText type="numeric" color={colors.accent}>₨{totalRevenue.toLocaleString()}</ThemedText>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.summaryCard}>
-          <ThemedText type="caption" color={colors.textSecondary}>Profit</ThemedText>
-          <ThemedText type="numeric" color={totalProfit >= 0 ? colors.success : colors.danger}>
-            ₨{totalProfit.toLocaleString()}
+        <TouchableOpacity
+          style={[styles.summaryCard, { borderLeftWidth: 3, borderLeftColor: colors.primary500 }]}
+          onPress={() => setInfoModal('revenue')} activeOpacity={0.75}
+        >
+          <View style={styles.summaryIconRow}>
+            <View style={[styles.summaryIcon, { backgroundColor: colors.primary50 }]}>
+              <Ionicons name="cash-outline" size={14} color={colors.primary500} />
+            </View>
+            <ThemedText type="overline" color={colors.textTertiary}>REVENUE</ThemedText>
+          </View>
+          <ThemedText type="h4" color={colors.primary500} numberOfLines={1}>{fmtCurrency(totalRevenue)}</ThemedText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.summaryCard, { borderLeftWidth: 3, borderLeftColor: totalProfit >= 0 ? colors.success : colors.danger }]}
+          onPress={() => setInfoModal('profit')} activeOpacity={0.75}
+        >
+          <View style={styles.summaryIconRow}>
+            <View style={[styles.summaryIcon, { backgroundColor: totalProfit >= 0 ? colors.successBg : colors.dangerBg }]}>
+              <Ionicons name="trending-up-outline" size={14} color={totalProfit >= 0 ? colors.success : colors.danger} />
+            </View>
+            <ThemedText type="overline" color={colors.textTertiary}>PROFIT</ThemedText>
+          </View>
+          <ThemedText type="h4" color={totalProfit >= 0 ? colors.success : colors.danger} numberOfLines={1}>
+            {fmtCurrency(totalProfit, true)}
           </ThemedText>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.summaryCard}>
-          <ThemedText type="caption" color={colors.textSecondary}>Transactions</ThemedText>
-          <ThemedText type="numeric" color={colors.textPrimary}>{sales?.length ?? 0}</ThemedText>
-        </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.summaryCard, { borderLeftWidth: 3, borderLeftColor: colors.info }]}
+          onPress={() => setInfoModal('txn')} activeOpacity={0.75}
+        >
+          <View style={styles.summaryIconRow}>
+            <View style={[styles.summaryIcon, { backgroundColor: colors.infoBg }]}>
+              <Ionicons name="receipt-outline" size={14} color={colors.info} />
+            </View>
+            <ThemedText type="overline" color={colors.textTertiary}>TXN</ThemedText>
+          </View>
+          <ThemedText type="h4" color={colors.textPrimary} numberOfLines={1}>{sales?.length ?? 0}</ThemedText>
+        </TouchableOpacity>
       </View>
+
+      <StatInfoModal
+        visible={infoModal === 'revenue'}
+        onClose={() => setInfoModal(null)}
+        label="Total Revenue"
+        description="The total amount collected from all sales in the current filter period."
+        value={totalRevenue}
+        icon="cash-outline"
+        accentColor={colors.primary500}
+        accentBg={colors.primary50}
+      />
+      <StatInfoModal
+        visible={infoModal === 'profit'}
+        onClose={() => setInfoModal(null)}
+        label="Gross Profit"
+        description="Revenue minus the cost of goods sold (COGS). This is your earnings before operating expenses."
+        value={totalProfit}
+        icon="trending-up-outline"
+        accentColor={totalProfit >= 0 ? colors.success : colors.danger}
+        accentBg={totalProfit >= 0 ? colors.successBg : colors.dangerBg}
+      />
+      <StatInfoModal
+        visible={infoModal === 'txn'}
+        onClose={() => setInfoModal(null)}
+        label="Transactions"
+        description="Total number of individual sale transactions recorded in the current filter period."
+        value={sales?.length ?? 0}
+        isCurrency={false}
+        icon="receipt-outline"
+        accentColor={colors.info}
+        accentBg={colors.infoBg}
+      />
 
       {/* Search row lives outside FlashList so dropdown overlays cards */}
       <View style={styles.searchSection}>
@@ -134,7 +192,9 @@ export default function SalesView() {
       <FlashList
         data={sales ?? []}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <SaleCard item={item} />}
+        renderItem={({ item }) => (
+          <SaleCard item={item} onPress={() => router.push(`/(app)/sale/${item.id}`)} />
+        )}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary500} />}
@@ -145,8 +205,8 @@ export default function SalesView() {
               {(filters.dateFrom || filters.dateTo) ? (
                 <ActiveChip label="Date range" onRemove={() => setFilters((f) => ({ ...f, dateFrom: null, dateTo: null }))} />
               ) : null}
-              {filters.sortBy !== 'date_desc' ? (
-                <ActiveChip label="Sorted" onRemove={() => setFilters((f) => ({ ...f, sortBy: 'date_desc' }))} />
+              {filters.sortBy !== TRANSACTION_SORT.DATE_DESC ? (
+                <ActiveChip label="Sorted" onRemove={() => setFilters((f) => ({ ...f, sortBy: TRANSACTION_SORT.DATE_DESC }))} />
               ) : null}
             </View>
             <TouchableOpacity onPress={handleResetAll} style={styles.resetAllBtn}>
@@ -178,7 +238,7 @@ export default function SalesView() {
       </TouchableOpacity>
 
       <TransactionFilterSheet
-        mode="sales"
+        mode={TRANSACTION_MODE.SALES}
         visible={sheetOpen}
         filters={filters}
         onApply={handleApply}
@@ -221,11 +281,19 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     flexDirection: 'row', marginHorizontal: spacing[5], marginBottom: spacing[4],
-    backgroundColor: colors.bgCard, borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+    gap: spacing[3],
+  },
+  summaryCard: {
+    flex: 1, backgroundColor: colors.bgCard, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[4], gap: spacing[2],
     ...shadows.sm,
   },
-  summaryCard: { flex: 1, alignItems: 'center', paddingVertical: spacing[4], gap: spacing[1] },
-  divider: { width: 1, backgroundColor: colors.border, marginVertical: spacing[3] },
+  summaryIconRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  summaryIcon: {
+    width: 24, height: 24, borderRadius: 6,
+    alignItems: 'center', justifyContent: 'center',
+  },
   list: { paddingHorizontal: spacing[5], paddingBottom: spacing[12] },
   searchSection: {
     paddingHorizontal: spacing[5],

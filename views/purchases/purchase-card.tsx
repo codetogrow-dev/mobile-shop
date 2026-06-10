@@ -1,8 +1,9 @@
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { ThemedText } from '@/components/themed-text';
 import { colors, spacing, radius } from '@/constants/theme';
+import { fmtCurrency, fmtPct } from '@/lib/format-num';
 
 export interface PurchaseCardData {
   id: string;
@@ -16,7 +17,7 @@ export interface PurchaseCardData {
   products?: { name: string } | null;
 }
 
-export function PurchaseCard({ item, showProduct = true }: { item: PurchaseCardData; showProduct?: boolean }) {
+export function PurchaseCard({ item, showProduct = true, onPress }: { item: PurchaseCardData; showProduct?: boolean; onPress?: () => void }) {
   const totalCost = Number(item.cost_price) * item.quantity;
   const profitPerUnit = Number(item.selling_price) - Number(item.cost_price);
   const totalProfit = profitPerUnit * item.quantity;
@@ -26,7 +27,7 @@ export function PurchaseCard({ item, showProduct = true }: { item: PurchaseCardD
   const remaining = item.quantity_remaining ?? null;
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={onPress ? 0.75 : 1}>
       {/* Top row: icon + title + date */}
       <View style={styles.topRow}>
         <View style={styles.iconBox}>
@@ -61,16 +62,12 @@ export function PurchaseCard({ item, showProduct = true }: { item: PurchaseCardD
             valueColor={remaining === 0 ? colors.danger : remaining < item.quantity * 0.3 ? colors.warning : colors.success}
           />
         )}
-        <MetricCell label="Purchase Price" value={`₨${Number(item.cost_price).toLocaleString()}`} />
-        <MetricCell label="Sale Price" value={`₨${Number(item.selling_price).toLocaleString()}`} />
-        <MetricCell
-          label="Total Cost"
-          value={`₨${totalCost.toLocaleString()}`}
-          valueColor={colors.textPrimary}
-        />
+        <MetricCell label="Purchase Price" value={fmtCurrency(Number(item.cost_price))} />
+        <MetricCell label="Sale Price" value={fmtCurrency(Number(item.selling_price))} />
+        <MetricCell label="Total Cost" value={fmtCurrency(totalCost)} valueColor={colors.textPrimary} />
         <MetricCell
           label={`Profit / unit (${marginPct}%)`}
-          value={`₨${profitPerUnit.toLocaleString()}`}
+          value={fmtCurrency(profitPerUnit, true)}
           valueColor={profitPerUnit >= 0 ? colors.success : colors.danger}
         />
       </View>
@@ -79,7 +76,7 @@ export function PurchaseCard({ item, showProduct = true }: { item: PurchaseCardD
       <View style={[styles.profitBanner, { backgroundColor: totalProfit >= 0 ? colors.successBg : colors.dangerBg }]}>
         <ThemedText type="caption" color={colors.textSecondary}>Expected Profit (batch)</ThemedText>
         <ThemedText type="h4" color={totalProfit >= 0 ? colors.success : colors.danger}>
-          {totalProfit >= 0 ? '+' : ''}₨{totalProfit.toLocaleString()}
+          {fmtCurrency(totalProfit, true)}
         </ThemedText>
       </View>
 
@@ -89,7 +86,7 @@ export function PurchaseCard({ item, showProduct = true }: { item: PurchaseCardD
           <ThemedText type="caption" color={colors.textSecondary}>{item.notes}</ThemedText>
         </View>
       ) : null}
-    </View>
+    </TouchableOpacity>
   );
 }
 

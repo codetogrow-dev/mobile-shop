@@ -1,19 +1,19 @@
+import { useEffect } from "react";
 import { colors } from "@/constants/theme";
 import { useAuthStore } from "@/store/auth-store";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 
 export default function AppLayout() {
   const session = useAuthStore((s) => s.session);
   const isLoading = useAuthStore((s) => s.isLoading);
 
-  // AUTH GUARD COMMENTED OUT FOR DEVELOPMENT
-  // useEffect(() => {
-  //   if (!isLoading && !session) {
-  //     router.replace('/(auth)/login');
-  //   }
-  // }, [session, isLoading]);
+  useEffect(() => {
+    if (!isLoading && !session) {
+      router.replace('/(auth)/login');
+    }
+  }, [session, isLoading]);
 
-  // if (isLoading || !session) return null;
+  if (isLoading || !session) return null;
 
   return (
     <Stack
@@ -31,6 +31,8 @@ export default function AppLayout() {
         name="edit-product/[id]"
         options={{ presentation: "modal" }}
       />
+      <Stack.Screen name="sale/[id]" />
+      <Stack.Screen name="purchase/[id]" />
     </Stack>
   );
 }

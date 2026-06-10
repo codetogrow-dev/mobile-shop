@@ -20,6 +20,10 @@ export interface ComboboxProps {
   onChangeSelectedIds: (ids: string[]) => void;
   placeholder: string;
   multiple?: boolean;
+  /** When true, no full-screen backdrop is rendered (use inside ScrollView/sheets) */
+  noBackdrop?: boolean;
+  /** Called whenever the dropdown opens or closes */
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function Combobox({
@@ -28,6 +32,8 @@ export function Combobox({
   onChangeSelectedIds,
   placeholder,
   multiple = true,
+  noBackdrop = false,
+  onOpenChange,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -43,8 +49,8 @@ export function Combobox({
 
   const close = () => {
     setOpen(false);
+    onOpenChange?.(false);
     inputRef.current?.blur();
-    // restore label in single mode
     if (!multiple && selectedIds.length > 0) {
       setQuery(items.find((i) => i.id === selectedIds[0])?.label ?? '');
     }
@@ -52,6 +58,7 @@ export function Combobox({
 
   const openDropdown = () => {
     setOpen(true);
+    onOpenChange?.(true);
     if (!multiple) setQuery('');
     setTimeout(() => inputRef.current?.focus(), 30);
   };
@@ -79,6 +86,7 @@ export function Combobox({
       onChangeSelectedIds(alreadySelected ? [] : [id]);
       setQuery(alreadySelected ? '' : label);
       setOpen(false);
+      onOpenChange?.(false);
       inputRef.current?.blur();
       return;
     }
@@ -100,8 +108,8 @@ export function Combobox({
 
   return (
     <View style={styles.wrapper}>
-      {/* Full-screen backdrop — closes dropdown on outside tap */}
-      {open && (
+      {/* Full-screen backdrop — closes dropdown on outside tap (skip inside sheets/ScrollViews) */}
+      {open && !noBackdrop && (
         <TouchableOpacity
           style={styles.backdrop}
           onPress={close}
