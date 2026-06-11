@@ -2,12 +2,15 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-nat
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
 import { useAuthStore } from '@/store/auth-store';
 import { signOut } from '@/api/auth';
+import { QK } from '@/constants/query-keys';
+import { getOverdueCount } from '@/api/dues';
 
 function SettingRow({
   icon,
@@ -15,12 +18,14 @@ function SettingRow({
   value,
   onPress,
   danger,
+  badge,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value?: string;
   onPress?: () => void;
   danger?: boolean;
+  badge?: number;
 }) {
   return (
     <TouchableOpacity
@@ -36,6 +41,13 @@ function SettingRow({
         <ThemedText type="body" color={danger ? colors.danger : colors.textPrimary}>{label}</ThemedText>
         {value && <ThemedText type="caption" color={colors.textTertiary}>{value}</ThemedText>}
       </View>
+      {badge !== undefined && badge > 0 && (
+        <View style={styles.badge}>
+          <ThemedText type="overline" color={colors.textInverse} style={{ fontSize: 10 }}>
+            {badge}
+          </ThemedText>
+        </View>
+      )}
       {onPress && <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />}
     </TouchableOpacity>
   );
@@ -44,6 +56,13 @@ function SettingRow({
 export default function SettingsView() {
   const insets = useSafeAreaInsets();
   const { user, clearSession } = useAuthStore();
+
+  const { data: overdue } = useQuery({
+    queryKey: QK.dues.overdueCount,
+    queryFn: getOverdueCount,
+    staleTime: 60_000,
+  });
+  const overdueTotal = (overdue?.receivables_overdue ?? 0) + (overdue?.payables_overdue ?? 0);
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -78,27 +97,21 @@ export default function SettingsView() {
           </View>
         </View>
 
-        {/* Navigation */}
+        {/* Money */}
         <Card padded={false}>
           <SettingRow
-            icon="cube-outline"
-            label="Inventory"
-            value="Manage products"
-            onPress={() => router.push('/(app)/(tabs)/inventory')}
+            icon="wallet-outline"
+            label="Dues"
+            value="Receivables & payables"
+            badge={overdueTotal}
+            onPress={() => router.push('/(app)/(tabs)/dues' as any)}
           />
           <View style={styles.separator} />
           <SettingRow
-            icon="cart-outline"
-            label="All Purchases"
-            value="View purchase history"
-            onPress={() => router.push('/(app)/purchases')}
-          />
-          <View style={styles.separator} />
-          <SettingRow
-            icon="receipt-outline"
-            label="All Sales"
-            value="View sales history"
-            onPress={() => router.push('/(app)/(tabs)/sales')}
+            icon="bar-chart-outline"
+            label="Reports"
+            value="Revenue, profit & analytics"
+            onPress={() => router.push('/(app)/(tabs)/reports' as any)}
           />
         </Card>
 
@@ -182,4 +195,14 @@ const styles = StyleSheet.create({
   },
   settingInfo: { flex: 1 },
   separator: { height: 1, backgroundColor: colors.border, marginHorizontal: spacing[4] },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    marginRight: spacing[2],
+  },
 });

@@ -13,13 +13,23 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Combobox } from '@/components/ui/combobox';
+import { PersonPicker } from '@/components/ui/person-picker';
+import { PaymentSection } from '@/components/ui/payment-section';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
-import { fmtCurrency } from '@/lib/format-num';
 import { saleSchema, type SaleFormValues } from '@/types/app';
 import { createSale } from '@/api/sales';
 import { listProducts } from '@/api/products';
 import { QK } from '@/constants/query-keys';
 import { useAuthStore } from '@/store/auth-store';
+import { PAYMENT_MODE } from '@/constants/enums';
+
+interface ProductItem {
+  id: string;
+  label: string;
+  current_stock: number;
+  reorder_point: number;
+}
 
 export default function AddSaleView() {
   const insets = useSafeAreaInsets();
@@ -32,21 +42,39 @@ export default function AddSaleView() {
     queryFn: () => listProducts({ search: productSearch }),
   });
 
-  const { control, handleSubmit, formState: { errors }, watch, setValue } = useForm<SaleFormValues, any, SaleFormValues>({
-    resolver: zodResolver(saleSchema) as any,
-    defaultValues: {
-      product_id: '',
-      quantity: 1,
-      sale_price_per_unit: 0,
-      sold_at: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
-    },
-  });
+  const productItems: ProductItem[] = (products ?? [])
+    .filter((p) => p.current_stock > 0)
+    .map((p) => ({
+      id: p.id,
+      label: p.name,
+      current_stock: Number(p.current_stock),
+      reorder_point: Number(p.reorder_point),
+    }));
 
+  const { control, handleSubmit, formState: { errors }, watch, setValue } =
+    useForm<SaleFormValues, any, SaleFormValues>({
+      resolver: zodResolver(saleSchema) as any,
+      defaultValues: {
+        product_id: '',
+        quantity: 1,
+        sale_price_per_unit: 0,
+        sold_at: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+        payment_mode: PAYMENT_MODE.FULL,
+        customer_id: null,
+        due_date: null,
+      } as any,
+    });
+
+  const [pickerOpen, setPickerOpen] = useState(false);
   const selectedProductId = watch('product_id');
-  const qty = watch('quantity');
-  const price = watch('sale_price_per_unit');
+  const qty               = Number(watch('quantity')) || 0;
+  const price             = Number(watch('sale_price_per_unit')) || 0;
+  const total             = qty * price;
+  const paymentMode       = watch('payment_mode');
+  const amountPaidStr     = String(watch('amount_paid') ?? '');
+  const dueDate           = (watch('due_date') as string | null) ?? null;
+  const customerId        = (watch('customer_id') as string | null) ?? null;
   const selectedProduct = products?.find((p) => p.id === selectedProductId);
-  const total = Number(qty) * Number(price);
 
   const mutation = useMutation({
     mutationFn: (values: SaleFormValues) =>
@@ -54,11 +82,13 @@ export default function AddSaleView() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.products.all });
       qc.invalidateQueries({ queryKey: QK.sales.all });
+      qc.invalidateQueries({ queryKey: QK.dues.all });
+      qc.invalidateQueries({ queryKey: QK.customers.all });
       router.back();
     },
   });
 
-  const stockOk = !selectedProduct || Number(qty) <= selectedProduct.current_stock;
+  const stockOk = !selectedProduct || qty <= selectedProduct.current_stock;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -83,44 +113,50 @@ export default function AddSaleView() {
           )}
 
           {/* Product Picker */}
-          <Card>
+          <Card style={pickerOpen ? styles.productCardElevated : undefined}>
             <ThemedText type="h4" style={styles.sectionTitle}>Select Product</ThemedText>
-            <Input
+            <Combobox<ProductItem>
+              items={productItems}
+              selectedIds={selectedProductId ? [selectedProductId] : []}
+              onChangeSelectedIds={(ids) =>
+                setValue('product_id', ids[0] ?? '', { shouldValidate: true })
+              }
               placeholder="Search products…"
-              value={productSearch}
-              onChangeText={setProductSearch}
-              leftIcon={<Ionicons name="search" size={16} color={colors.textTertiary} />}
-            />
-            <View style={styles.productList}>
-              {products?.filter(p => p.current_stock > 0).slice(0, 6).map((p) => (
-                <TouchableOpacity
-                  key={p.id}
-                  style={[styles.productRow, selectedProductId === p.id && styles.productRowActive]}
-                  onPress={() => setValue('product_id', p.id)}
-                  activeOpacity={0.7}
-                >
+              multiple={false}
+              noBackdrop
+              onOpenChange={setPickerOpen}
+              onQueryChange={setProductSearch}
+              renderItem={({ item, selected }) => (
+                <View style={styles.productRowInner}>
                   <View style={styles.productRowInfo}>
-                    <ThemedText type="body" color={selectedProductId === p.id ? colors.primary600 : colors.textPrimary}>
-                      {p.name}
+                    <ThemedText
+                      type="body"
+                      color={selected ? colors.primary600 : colors.textPrimary}
+                      style={selected ? { fontWeight: '700' } : undefined}
+                      numberOfLines={1}
+                    >
+                      {item.label}
                     </ThemedText>
                     <ThemedText type="caption" color={colors.textTertiary}>
-                      Available: {p.current_stock}
+                      Available: {item.current_stock}
                     </ThemedText>
                   </View>
                   <View style={styles.productRowRight}>
                     <Badge
-                      label={`${p.current_stock} left`}
-                      variant={p.current_stock <= p.reorder_point ? 'warning' : 'success'}
+                      label={`${item.current_stock} left`}
+                      variant={item.current_stock <= item.reorder_point ? 'warning' : 'success'}
                     />
-                    {selectedProductId === p.id && (
+                    {selected && (
                       <Ionicons name="checkmark-circle" size={18} color={colors.primary500} />
                     )}
                   </View>
-                </TouchableOpacity>
-              ))}
-            </View>
+                </View>
+              )}
+            />
             {errors.product_id && (
-              <ThemedText type="caption" color={colors.danger}>{errors.product_id.message}</ThemedText>
+              <ThemedText type="caption" color={colors.danger} style={{ marginTop: spacing[2] }}>
+                {errors.product_id.message}
+              </ThemedText>
             )}
           </Card>
 
@@ -174,17 +210,47 @@ export default function AddSaleView() {
                 />
               )}
             />
+          </Card>
 
-            {total > 0 && (
-              <View style={styles.totalRow}>
-                <ThemedText type="body" color={colors.textSecondary}>Total Amount</ThemedText>
-                <ThemedText type="numeric" color={colors.accent}>{fmtCurrency(total)}</ThemedText>
-              </View>
-            )}
+          {/* Customer */}
+          <Card>
+            <ThemedText type="h4" style={styles.sectionTitle}>
+              Customer{paymentMode === PAYMENT_MODE.FULL ? ' (optional)' : ''}
+            </ThemedText>
+            <PersonPicker
+              kind="customer"
+              value={customerId}
+              onChange={(id) => setValue('customer_id', id, { shouldValidate: true })}
+              error={errors.customer_id?.message}
+              required={paymentMode !== PAYMENT_MODE.FULL}
+            />
+          </Card>
+
+          {/* Payment */}
+          <Card>
+            <ThemedText type="h4" style={styles.sectionTitle}>Payment</ThemedText>
+            <PaymentSection
+              total={total}
+              mode={paymentMode}
+              onModeChange={(m) => setValue('payment_mode', m, { shouldValidate: true })}
+              amountPaidStr={amountPaidStr}
+              onAmountPaidChange={(v) => setValue('amount_paid', v as any, { shouldValidate: true })}
+              amountPaidError={errors.amount_paid?.message}
+              dueDate={dueDate}
+              onDueDateChange={(v) => setValue('due_date', v, { shouldValidate: true })}
+              dueDateError={errors.due_date?.message as string | undefined}
+              partyLabel="customer"
+            />
           </Card>
 
           <Button
-            label="Record Sale"
+            label={
+              paymentMode === PAYMENT_MODE.FULL
+                ? 'Record Sale'
+                : paymentMode === PAYMENT_MODE.UNPAID
+                  ? 'Record on Credit'
+                  : 'Record Partial Sale'
+            }
             onPress={handleSubmit((v) => mutation.mutate(v))}
             loading={mutation.isPending}
             disabled={!stockOk}
@@ -230,31 +296,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.danger,
   },
-  productList: { marginTop: spacing[3], gap: spacing[2] },
-  productRow: {
+  productRowInner: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[3],
-    borderRadius: radius.md,
-    backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: spacing[3],
   },
-  productRowActive: {
-    borderColor: colors.primary300,
-    backgroundColor: colors.primary50,
-  },
-  productRowInfo: { gap: 2 },
+  productRowInfo: { flex: 1, gap: 2 },
   productRowRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing[3],
-    paddingTop: spacing[3],
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
+  // Raised above the next Card while the dropdown is open so it doesn't get
+  // covered. Higher than the next sibling's default elevation/zIndex.
+  productCardElevated: { zIndex: 100, elevation: 12 },
 });

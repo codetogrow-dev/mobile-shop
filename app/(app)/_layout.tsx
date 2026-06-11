@@ -23,7 +23,6 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="purchases/index" />
       <Stack.Screen name="add-sale" options={{ presentation: "modal" }} />
       <Stack.Screen name="add-purchase" options={{ presentation: "modal" }} />
       <Stack.Screen name="add-product" options={{ presentation: "modal" }} />
@@ -33,6 +32,9 @@ export default function AppLayout() {
       />
       <Stack.Screen name="sale/[id]" />
       <Stack.Screen name="purchase/[id]" />
+      <Stack.Screen name="customer/[id]" />
+      <Stack.Screen name="supplier/[id]" />
+      <Stack.Screen name="record-payment" options={{ presentation: "modal" }} />
     </Stack>
   );
 }

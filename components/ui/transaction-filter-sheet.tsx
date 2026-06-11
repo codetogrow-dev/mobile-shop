@@ -8,9 +8,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { ThemedText } from '@/components/themed-text';
 import { DatePickerField } from '@/components/ui/date-picker-field';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
-import type { SaleFilters, PurchaseFilters, SaleSortBy, PurchaseSortBy } from '@/types/app';
+import type { SaleFilters, PurchaseFilters, SaleSortBy, PurchaseSortBy, PaymentStatusFilter } from '@/types/app';
 import { DEFAULT_SALE_FILTERS, DEFAULT_PURCHASE_FILTERS } from '@/types/app';
-import { TRANSACTION_SORT, TRANSACTION_MODE } from '@/constants/enums';
+import { TRANSACTION_SORT, TRANSACTION_MODE, PAYMENT_STATUS_FILTER } from '@/constants/enums';
 
 // ─── Sales variant ────────────────────────────────────────────────────────────
 
@@ -53,8 +53,17 @@ export function countTransactionFiltersActive(f: SaleFilters | PurchaseFilters):
   if (f.dateFrom || f.dateTo) n++;
   if (f.sortBy !== TRANSACTION_SORT.DATE_DESC) n++;
   if ('supplier' in f && f.supplier) n++;
+  if (f.paymentStatus && f.paymentStatus !== PAYMENT_STATUS_FILTER.ALL) n++;
   return n;
 }
+
+const PAYMENT_STATUS_OPTIONS: { value: PaymentStatusFilter; label: string; icon: string }[] = [
+  { value: PAYMENT_STATUS_FILTER.ALL,     label: 'All',     icon: 'apps-outline' },
+  { value: PAYMENT_STATUS_FILTER.PAID,    label: 'Paid',    icon: 'checkmark-circle-outline' },
+  { value: PAYMENT_STATUS_FILTER.PARTIAL, label: 'Partial', icon: 'time-outline' },
+  { value: PAYMENT_STATUS_FILTER.UNPAID,  label: 'Unpaid',  icon: 'wallet-outline' },
+  { value: PAYMENT_STATUS_FILTER.OVERDUE, label: 'Overdue', icon: 'alert-circle-outline' },
+];
 
 export function TransactionFilterSheet(props: Props) {
   const { visible, onClose, mode } = props;
@@ -188,6 +197,40 @@ export function TransactionFilterSheet(props: Props) {
             </View>
           </Section>
 
+          {/* ── Payment Status ── */}
+          <Section title="Payment Status">
+            <View style={styles.statusGrid}>
+              {PAYMENT_STATUS_OPTIONS.map((o) => {
+                const active = (draft.paymentStatus ?? PAYMENT_STATUS_FILTER.ALL) === o.value;
+                const isDanger = o.value === PAYMENT_STATUS_FILTER.OVERDUE || o.value === PAYMENT_STATUS_FILTER.UNPAID;
+                return (
+                  <TouchableOpacity
+                    key={o.value}
+                    style={[
+                      styles.statusChip,
+                      active && (isDanger ? styles.statusChipDangerActive : styles.statusChipActive),
+                    ]}
+                    onPress={() => set('paymentStatus' as any, o.value)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={o.icon as any}
+                      size={14}
+                      color={active ? (isDanger ? colors.danger : colors.primary500) : colors.textTertiary}
+                    />
+                    <ThemedText
+                      type="caption"
+                      color={active ? (isDanger ? colors.danger : colors.primary500) : colors.textPrimary}
+                      style={active && { fontWeight: '600' }}
+                    >
+                      {o.label}
+                    </ThemedText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Section>
+
           {/* ── Sort ── */}
           <Section title="Sort By">
             <View style={styles.sortList}>
@@ -318,6 +361,15 @@ const styles = StyleSheet.create({
     borderColor: colors.border, backgroundColor: colors.bgElevated,
   },
   sortRowActive: { borderColor: colors.primary300, backgroundColor: colors.primary50 },
+  statusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  statusChip: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[1],
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.full, borderWidth: 1,
+    borderColor: colors.border, backgroundColor: colors.bgElevated,
+  },
+  statusChipActive: { borderColor: colors.primary300, backgroundColor: colors.primary50 },
+  statusChipDangerActive: { borderColor: colors.danger + '60', backgroundColor: colors.dangerBg },
   footer: {
     padding: spacing[5], paddingBottom: spacing[6],
     borderTopWidth: 1, borderTopColor: colors.border,

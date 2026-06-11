@@ -43,6 +43,64 @@ export const productSchema = z.object({
 });
 export type ProductFormValues = z.infer<typeof productSchema>;
 
+// ─── Parties (Customers / Suppliers) ─────────────────────────────────────────
+
+const phoneRegex = /^[+\d][\d\s\-()]*$/;
+// CNIC: 13 digits total, formatted as XXXXX-XXXXXXX-X.
+const cnicRegex = /^\d{5}-\d{7}-\d$/;
+
+const partyShape = {
+  name: z.string().min(1, 'Name is required'),
+  phone: z.string().regex(phoneRegex, 'Enter a valid phone').or(z.literal('')).optional(),
+  cnic: z.string().regex(cnicRegex, 'CNIC must be XXXXX-XXXXXXX-X').or(z.literal('')).optional(),
+  address: z.string().or(z.literal('')).optional(),
+  notes: z.string().or(z.literal('')).optional(),
+};
+
+export const customerSchema = z.object(partyShape);
+export type CustomerFormValues = z.infer<typeof customerSchema>;
+
+export const supplierSchema = z.object(partyShape);
+export type SupplierFormValues = z.infer<typeof supplierSchema>;
+
+export interface Party {
+  id: string;
+  name: string;
+  phone: string | null;
+  cnic: string | null;
+  address: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Payments ────────────────────────────────────────────────────────────────
+
+import { PAYMENT_MODE, PAYMENT_STATUS, PAYMENT_STATUS_FILTER } from '@/constants/enums';
+
+export type PaymentMode   = typeof PAYMENT_MODE[keyof typeof PAYMENT_MODE];
+export type PaymentStatus = typeof PAYMENT_STATUS[keyof typeof PAYMENT_STATUS];
+export type PaymentStatusFilter = typeof PAYMENT_STATUS_FILTER[keyof typeof PAYMENT_STATUS_FILTER];
+
+export const paymentSchema = z.object({
+  amount: numStr('Enter amount').pipe(z.number().min(0.01, 'Amount must be > 0')),
+  paid_at: z.string(),
+  method: z.string().or(z.literal('')).optional(),
+  note: z.string().or(z.literal('')).optional(),
+});
+export type PaymentFormValues = z.infer<typeof paymentSchema>;
+
+export interface Payment {
+  id: string;
+  transaction_type: 'sale' | 'purchase';
+  transaction_id: string;
+  amount: number;
+  paid_at: string;
+  method: string | null;
+  note: string | null;
+  created_at: string;
+}
+
 // ─── Purchase ─────────────────────────────────────────────────────────────────
 
 export const purchaseSchema = z.object({
@@ -51,8 +109,32 @@ export const purchaseSchema = z.object({
   cost_price: numStr('Enter cost price').pipe(z.number().min(0.01, 'Enter a valid cost price')),
   selling_price: numStr('Enter selling price').pipe(z.number().min(0.01, 'Enter a valid selling price')),
   supplier: z.string().optional(),
+  supplier_id: z.string().check(z.uuid()).nullable().optional(),
   notes: z.string().optional(),
   purchased_at: z.string(),
+  payment_mode: z.enum([PAYMENT_MODE.FULL, PAYMENT_MODE.PARTIAL, PAYMENT_MODE.UNPAID]).default(PAYMENT_MODE.FULL),
+  amount_paid: numStr('Enter amount paid').pipe(z.number().min(0)).optional(),
+  due_date: z.string().nullable().optional(),
+}).superRefine((data, ctx) => {
+  const total = (Number(data.quantity) || 0) * (Number(data.cost_price) || 0);
+  if (data.payment_mode === PAYMENT_MODE.PARTIAL) {
+    const paid = Number(data.amount_paid ?? 0);
+    if (!(paid > 0 && paid < total)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['amount_paid'],
+        message: `Partial payment must be between 0 and ${total.toFixed(2)}`,
+      });
+    }
+  }
+  if (data.payment_mode !== PAYMENT_MODE.FULL) {
+    if (!data.due_date) {
+      ctx.addIssue({ code: 'custom', path: ['due_date'], message: 'Pick a due date' });
+    }
+    if (!data.supplier_id) {
+      ctx.addIssue({ code: 'custom', path: ['supplier_id'], message: 'Pick or add a supplier' });
+    }
+  }
 });
 export type PurchaseFormValues = z.infer<typeof purchaseSchema>;
 
@@ -64,6 +146,30 @@ export const saleSchema = z.object({
   sale_price_per_unit: numStr('Enter sale price').pipe(z.number().min(0.01, 'Enter a valid sale price')),
   notes: z.string().optional(),
   sold_at: z.string(),
+  customer_id: z.string().check(z.uuid()).nullable().optional(),
+  payment_mode: z.enum([PAYMENT_MODE.FULL, PAYMENT_MODE.PARTIAL, PAYMENT_MODE.UNPAID]).default(PAYMENT_MODE.FULL),
+  amount_paid: numStr('Enter amount paid').pipe(z.number().min(0)).optional(),
+  due_date: z.string().nullable().optional(),
+}).superRefine((data, ctx) => {
+  const total = (Number(data.quantity) || 0) * (Number(data.sale_price_per_unit) || 0);
+  if (data.payment_mode === PAYMENT_MODE.PARTIAL) {
+    const paid = Number(data.amount_paid ?? 0);
+    if (!(paid > 0 && paid < total)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['amount_paid'],
+        message: `Partial payment must be between 0 and ${total.toFixed(2)}`,
+      });
+    }
+  }
+  if (data.payment_mode !== PAYMENT_MODE.FULL) {
+    if (!data.due_date) {
+      ctx.addIssue({ code: 'custom', path: ['due_date'], message: 'Pick a due date' });
+    }
+    if (!data.customer_id) {
+      ctx.addIssue({ code: 'custom', path: ['customer_id'], message: 'Pick or add a customer' });
+    }
+  }
 });
 export type SaleFormValues = z.infer<typeof saleSchema>;
 
@@ -100,6 +206,7 @@ export interface SaleFilters {
   dateFrom: string | null;
   dateTo: string | null;
   sortBy: SaleSortBy;
+  paymentStatus: PaymentStatusFilter;
 }
 
 export interface PurchaseFilters {
@@ -108,6 +215,7 @@ export interface PurchaseFilters {
   dateTo: string | null;
   sortBy: PurchaseSortBy;
   supplier: string;
+  paymentStatus: PaymentStatusFilter;
 }
 
 export const DEFAULT_SALE_FILTERS: SaleFilters = {
@@ -115,6 +223,7 @@ export const DEFAULT_SALE_FILTERS: SaleFilters = {
   dateFrom: null,
   dateTo: null,
   sortBy: TRANSACTION_SORT.DATE_DESC,
+  paymentStatus: PAYMENT_STATUS_FILTER.ALL,
 };
 
 export const DEFAULT_PURCHASE_FILTERS: PurchaseFilters = {
@@ -123,6 +232,7 @@ export const DEFAULT_PURCHASE_FILTERS: PurchaseFilters = {
   dateTo: null,
   sortBy: TRANSACTION_SORT.DATE_DESC,
   supplier: '',
+  paymentStatus: PAYMENT_STATUS_FILTER.ALL,
 };
 
 export type DateRangeMode = typeof DATE_RANGE_MODE[keyof typeof DATE_RANGE_MODE];
@@ -197,6 +307,33 @@ export interface TopProduct {
   revenue: number;
 }
 
+// ─── Dues ────────────────────────────────────────────────────────────────────
+
+export interface DuesPartySummary {
+  party_id: string;
+  name: string;
+  phone: string | null;
+  total_due: number;
+  overdue_amount: number;
+  oldest_due_date: string | null;
+  transaction_count: number;
+}
+
+export interface DuesOverdueCount {
+  receivables_overdue: number;
+  payables_overdue: number;
+}
+
+export interface OverduePerson {
+  kind: 'customer' | 'supplier';
+  party_id: string;
+  name: string;
+  phone: string | null;
+  overdue_amount: number;
+  oldest_due_date: string | null;
+  transaction_count: number;
+}
+
 // ─── Navigation ───────────────────────────────────────────────────────────────
 
-export type TabName = 'dashboard' | 'inventory' | 'sales' | 'reports' | 'settings';
+export type TabName = 'dashboard' | 'inventory' | 'sales' | 'reports' | 'settings' | 'dues';

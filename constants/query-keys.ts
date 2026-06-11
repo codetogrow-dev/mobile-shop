@@ -1,7 +1,7 @@
 export const QK = {
   products: {
     all: ['products'] as const,
-    list: (filters?: Record<string, unknown>) => ['products', 'list', filters] as const,
+    list: (filters?: Record<string, unknown> | object) => ['products', 'list', filters] as const,
     detail: (id: string) => ['products', 'detail', id] as const,
     lowStock: ['products', 'low-stock'] as const,
     names: ['products', 'names'] as const,
@@ -32,6 +32,29 @@ export const QK = {
     outOfStockCount: ['reports', 'out-of-stock-count'] as const,
     monthToDate: ['reports', 'month-to-date'] as const,
     yesterday: ['reports', 'yesterday'] as const,
+  },
+  customers: {
+    all: ['customers'] as const,
+    list: (search?: string) => ['customers', 'list', search ?? ''] as const,
+    detail: (id: string) => ['customers', 'detail', id] as const,
+  },
+  suppliers: {
+    all: ['suppliers'] as const,
+    list: (search?: string) => ['suppliers', 'list', search ?? ''] as const,
+    detail: (id: string) => ['suppliers', 'detail', id] as const,
+  },
+  payments: {
+    byTransaction: (type: 'sale' | 'purchase', id: string) =>
+      ['payments', type, id] as const,
+  },
+  dues: {
+    all: ['dues'] as const,
+    receivables: ['dues', 'receivables'] as const,
+    payables: ['dues', 'payables'] as const,
+    overdueCount: ['dues', 'overdue-count'] as const,
+    overduePeople: ['dues', 'overdue-people'] as const,
+    customer: (id: string) => ['dues', 'customer', id] as const,
+    supplier: (id: string) => ['dues', 'supplier', id] as const,
   },
   profile: ['profile'] as const,
 } as const;

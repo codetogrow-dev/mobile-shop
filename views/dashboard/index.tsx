@@ -20,6 +20,7 @@ import { listProducts } from '@/api/products';
 import { KPIRow } from './kpi-row';
 import { LowStockList } from './low-stock-list';
 import { SparklineCard } from './sparkline-card';
+import { OverdueBanner } from '@/views/dues/overdue-banner';
 
 const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -120,6 +121,9 @@ export default function DashboardView() {
           <RefreshControl refreshing={dailyLoading} onRefresh={handleRefresh} tintColor={colors.primary500} />
         }
       >
+        {/* ── Overdue dues banner (renders only when overdue exists) ── */}
+        <OverdueBanner />
+
         {/* ── Today KPIs ── */}
         <ThemedText type="h4" style={styles.sectionLabel}>Today</ThemedText>
         <KPIRow

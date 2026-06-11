@@ -1,9 +1,11 @@
 import { ThemedText } from "@/components/themed-text";
+import { PaymentStatusBadge } from "@/components/ui/payment-status-badge";
 import { colors, radius, spacing } from "@/constants/theme";
 import { fmtCurrency } from "@/lib/format-num";
 import { Ionicons } from "@expo/vector-icons";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
+import type { PaymentStatus } from "@/types/app";
 
 export interface SaleCardData {
   id: string;
@@ -16,6 +18,10 @@ export interface SaleCardData {
   notes?: string | null;
   sold_at: string;
   products?: { name: string } | null;
+  customers?: { id: string; name: string; phone: string | null } | null;
+  payment_status?: PaymentStatus | null;
+  balance_due?: number | null;
+  due_date?: string | null;
 }
 
 export function SaleCard({
@@ -34,6 +40,14 @@ export function SaleCard({
   const profit = Number(item.gross_profit);
   const isProfit = profit >= 0;
   const marginPct = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0";
+
+  const status = item.payment_status ?? null;
+  const balance = Number(item.balance_due ?? 0);
+  const overdue =
+    balance > 0 &&
+    !!item.due_date &&
+    new Date(item.due_date) < new Date(new Date().toDateString());
+  const customerName = item.customers?.name ?? null;
 
   return (
     <TouchableOpacity
@@ -55,18 +69,56 @@ export function SaleCard({
           <ThemedText type="caption" color={colors.textTertiary}>
             {format(new Date(item.sold_at), "dd MMM yyyy · hh:mm a")}
           </ThemedText>
+          {customerName ? (
+            <View style={styles.customerRow}>
+              <Ionicons name="person-outline" size={12} color={colors.textTertiary} />
+              <ThemedText type="caption" color={colors.textSecondary}>{customerName}</ThemedText>
+            </View>
+          ) : null}
         </View>
-        {/* Revenue pill */}
-        <View style={styles.revenuePill}>
-          <ThemedText
-            type="caption"
-            color={colors.primary500}
-            style={{ fontWeight: "700" }}
-          >
-            {fmtCurrency(revenue)}
-          </ThemedText>
+        <View style={styles.topRowRight}>
+          {/* Revenue pill */}
+          <View style={styles.revenuePill}>
+            <ThemedText
+              type="caption"
+              color={colors.primary500}
+              style={{ fontWeight: "700" }}
+            >
+              {fmtCurrency(revenue)}
+            </ThemedText>
+          </View>
+          {status && (
+            <PaymentStatusBadge status={status} overdue={overdue} compact />
+          )}
         </View>
       </View>
+
+      {balance > 0 && (
+        <View style={[styles.dueRow, overdue && styles.dueRowOverdue]}>
+          <View style={styles.dueRowLeft}>
+            <Ionicons
+              name="time-outline"
+              size={13}
+              color={overdue ? colors.danger : colors.warning}
+            />
+            <ThemedText
+              type="caption"
+              color={overdue ? colors.danger : colors.textSecondary}
+            >
+              {item.due_date
+                ? `Due ${format(parseISO(item.due_date), "dd MMM")}`
+                : "No due date"}
+            </ThemedText>
+          </View>
+          <ThemedText
+            type="caption"
+            color={overdue ? colors.danger : colors.textPrimary}
+            style={{ fontWeight: "700" }}
+          >
+            {fmtCurrency(balance)} due
+          </ThemedText>
+        </View>
+      )}
 
       {/* Divider */}
       <View style={styles.divider} />
@@ -181,6 +233,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   titleBlock: { flex: 1, gap: 3 },
+  customerRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  topRowRight: { alignItems: "flex-end", gap: spacing[1] },
   revenuePill: {
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[1],
@@ -190,6 +244,20 @@ const styles = StyleSheet.create({
     borderColor: colors.primary200,
     alignSelf: "flex-start",
   },
+  dueRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginHorizontal: spacing[4],
+    marginTop: spacing[1],
+    marginBottom: spacing[2],
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    backgroundColor: colors.warningBg,
+    borderRadius: radius.md,
+  },
+  dueRowOverdue: { backgroundColor: colors.dangerBg },
+  dueRowLeft: { flexDirection: "row", alignItems: "center", gap: spacing[1] },
   divider: {
     height: 1,
     backgroundColor: colors.border,

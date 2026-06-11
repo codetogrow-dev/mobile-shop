@@ -80,9 +80,6 @@ export default function PurchasesView() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
         <View>
           <ThemedText type="h2">Purchases</ThemedText>
           <ThemedText type="caption" color={colors.textSecondary}>{dateLabel}</ThemedText>

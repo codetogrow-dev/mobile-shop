@@ -16,11 +16,16 @@ import { ThemedText } from '@/components/themed-text';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DatePickerField } from '@/components/ui/date-picker-field';
+import { PaymentStatusBadge } from '@/components/ui/payment-status-badge';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
 import { fmtCurrency, fmtPct } from '@/lib/format-num';
 import { StatInfoModal } from '@/components/ui/stat-info-modal';
 import { getSale, updateSale, deleteSale } from '@/api/sales';
+import { listPayments } from '@/api/payments';
 import { QK } from '@/constants/query-keys';
+import { ContactActions } from '@/views/customer-detail/contact-actions';
+import { PaymentTimeline } from '@/views/customer-detail/payment-timeline';
+import { parseISO } from 'date-fns';
 
 const numStr = (msg?: string) =>
   z.preprocess(
@@ -46,6 +51,12 @@ export default function SaleDetailView() {
   const { data: sale, isLoading } = useQuery({
     queryKey: QK.sales.detail(id),
     queryFn: () => getSale(id),
+    enabled: !!id,
+  });
+
+  const { data: payments } = useQuery({
+    queryKey: QK.payments.byTransaction('sale', id),
+    queryFn: () => listPayments('sale', id),
     enabled: !!id,
   });
 

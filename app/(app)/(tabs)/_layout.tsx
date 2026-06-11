@@ -2,8 +2,20 @@ import { colors, tabBar } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { Platform } from "react-native";
+import { useQuery } from "@tanstack/react-query";
+
+import { QK } from "@/constants/query-keys";
+import { getOverdueCount } from "@/api/dues";
 
 export default function TabsLayout() {
+  const { data: overdue } = useQuery({
+    queryKey: QK.dues.overdueCount,
+    queryFn: getOverdueCount,
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const overdueTotal = (overdue?.receivables_overdue ?? 0) + (overdue?.payables_overdue ?? 0);
+
   return (
     <Tabs
       screenOptions={{
@@ -52,11 +64,11 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="reports/index"
+        name="purchases/index"
         options={{
-          title: "Reports",
+          title: "Purchases",
           tabBarIcon: ({ color }) => (
-            <Ionicons name="bar-chart" size={24} color={color} />
+            <Ionicons name="cart" size={24} color={color} />
           ),
         }}
       />
@@ -67,16 +79,22 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => (
             <Ionicons name="settings" size={24} color={color} />
           ),
+          tabBarBadge: overdueTotal > 0 ? overdueTotal : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.danger,
+            color: colors.textInverse,
+            fontSize: 10,
+            minWidth: 18,
+            height: 18,
+            lineHeight: 18,
+          },
         }}
       />
-      <Tabs.Screen
-        name="inventory/[id]"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="settings/categories"
-        options={{ href: null }}
-      />
+      {/* Hidden tab entries (still routable, just not in the tab bar) */}
+      <Tabs.Screen name="dues/index"    options={{ href: null }} />
+      <Tabs.Screen name="reports/index" options={{ href: null }} />
+      <Tabs.Screen name="inventory/[id]"      options={{ href: null }} />
+      <Tabs.Screen name="settings/categories" options={{ href: null }} />
     </Tabs>
   );
 }

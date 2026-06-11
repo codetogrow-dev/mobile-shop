@@ -1,9 +1,11 @@
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ThemedText } from '@/components/themed-text';
+import { PaymentStatusBadge } from '@/components/ui/payment-status-badge';
 import { colors, spacing, radius } from '@/constants/theme';
 import { fmtCurrency, fmtPct } from '@/lib/format-num';
+import type { PaymentStatus } from '@/types/app';
 
 export interface PurchaseCardData {
   id: string;
@@ -15,6 +17,10 @@ export interface PurchaseCardData {
   notes?: string | null;
   purchased_at: string;
   products?: { name: string } | null;
+  suppliers?: { id: string; name: string; phone: string | null } | null;
+  payment_status?: PaymentStatus | null;
+  balance_due?: number | null;
+  due_date?: string | null;
 }
 
 export function PurchaseCard({ item, showProduct = true, onPress }: { item: PurchaseCardData; showProduct?: boolean; onPress?: () => void }) {
@@ -25,6 +31,10 @@ export function PurchaseCard({ item, showProduct = true, onPress }: { item: Purc
     ? ((profitPerUnit / Number(item.cost_price)) * 100).toFixed(1)
     : '0';
   const remaining = item.quantity_remaining ?? null;
+  const status = item.payment_status ?? null;
+  const balance = Number(item.balance_due ?? 0);
+  const overdue = balance > 0 && !!item.due_date && new Date(item.due_date) < new Date(new Date().toDateString());
+  const supplierName = item.suppliers?.name ?? item.supplier ?? null;
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={onPress ? 0.75 : 1}>
@@ -40,14 +50,31 @@ export function PurchaseCard({ item, showProduct = true, onPress }: { item: Purc
           <ThemedText type="caption" color={colors.textTertiary}>
             {format(new Date(item.purchased_at), 'dd MMM yyyy · hh:mm a')}
           </ThemedText>
-          {item.supplier ? (
+          {supplierName ? (
             <View style={styles.supplierRow}>
               <Ionicons name="business-outline" size={12} color={colors.textTertiary} />
-              <ThemedText type="caption" color={colors.textSecondary}>{item.supplier}</ThemedText>
+              <ThemedText type="caption" color={colors.textSecondary}>{supplierName}</ThemedText>
             </View>
           ) : null}
         </View>
+        {status && (
+          <PaymentStatusBadge status={status} overdue={overdue} compact />
+        )}
       </View>
+
+      {balance > 0 && (
+        <View style={[styles.dueRow, overdue && styles.dueRowOverdue]}>
+          <View style={styles.dueRowLeft}>
+            <Ionicons name="time-outline" size={13} color={overdue ? colors.danger : colors.warning} />
+            <ThemedText type="caption" color={overdue ? colors.danger : colors.textSecondary}>
+              {item.due_date ? `Due ${format(parseISO(item.due_date), 'dd MMM')}` : 'No due date'}
+            </ThemedText>
+          </View>
+          <ThemedText type="caption" color={overdue ? colors.danger : colors.textPrimary} style={{ fontWeight: '700' }}>
+            {fmtCurrency(balance)} owed
+          </ThemedText>
+        </View>
+      )}
 
       {/* Divider */}
       <View style={styles.divider} />
@@ -128,6 +155,20 @@ const styles = StyleSheet.create({
   titleBlock: { flex: 1, gap: 3 },
   supplierRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   divider: { height: 1, backgroundColor: colors.border, marginHorizontal: spacing[4] },
+  dueRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: spacing[4],
+    marginTop: spacing[1],
+    marginBottom: spacing[2],
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    backgroundColor: colors.warningBg,
+    borderRadius: radius.md,
+  },
+  dueRowOverdue: { backgroundColor: colors.dangerBg },
+  dueRowLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

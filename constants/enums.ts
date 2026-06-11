@@ -55,3 +55,40 @@ export const PRODUCT_TAB = {
   PURCHASES: 'purchases',
   SALES: 'sales',
 } as const;
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+
+export const PAYMENT_MODE = {
+  FULL: 'full',
+  PARTIAL: 'partial',
+  UNPAID: 'unpaid',
+} as const;
+
+export const PAYMENT_STATUS = {
+  PAID: 'paid',
+  PARTIAL: 'partial',
+  UNPAID: 'unpaid',
+} as const;
+
+export const PAYMENT_STATUS_FILTER = {
+  ALL: 'all',
+  PAID: 'paid',
+  PARTIAL: 'partial',
+  UNPAID: 'unpaid',
+  OVERDUE: 'overdue',
+} as const;
+
+export const TRANSACTION_KIND = {
+  SALE: 'sale',
+  PURCHASE: 'purchase',
+} as const;
+
+export const PARTY_KIND = {
+  CUSTOMER: 'customer',
+  SUPPLIER: 'supplier',
+} as const;
+
+export const DUES_TAB = {
+  RECEIVABLES: 'receivables',
+  PAYABLES: 'payables',
+} as const;

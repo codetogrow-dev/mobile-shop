@@ -14,8 +14,14 @@ export interface ComboboxItem {
   color?: string;
 }
 
-export interface ComboboxProps {
-  items: ComboboxItem[];
+export interface ComboboxRenderArgs<T extends ComboboxItem> {
+  item: T;
+  selected: boolean;
+  onSelect: () => void;
+}
+
+export interface ComboboxProps<T extends ComboboxItem = ComboboxItem> {
+  items: T[];
   selectedIds: string[];
   onChangeSelectedIds: (ids: string[]) => void;
   placeholder: string;
@@ -24,9 +30,17 @@ export interface ComboboxProps {
   noBackdrop?: boolean;
   /** Called whenever the dropdown opens or closes */
   onOpenChange?: (open: boolean) => void;
+  /** Called whenever the search query changes. Use this to drive server-side
+   * filtering — the parent can then update `items` so the dropdown stays in
+   * sync with the typed query. If omitted, the component filters locally. */
+  onQueryChange?: (query: string) => void;
+  /** Render the dropdown row with custom content. When omitted, the default
+   * label row is rendered. Other props (size, separators, selection styling)
+   * are kept identical so existing callers stay visually consistent. */
+  renderItem?: (args: ComboboxRenderArgs<T>) => React.ReactNode;
 }
 
-export function Combobox({
+export function Combobox<T extends ComboboxItem = ComboboxItem>({
   items,
   selectedIds,
   onChangeSelectedIds,
@@ -34,16 +48,22 @@ export function Combobox({
   multiple = true,
   noBackdrop = false,
   onOpenChange,
-}: ComboboxProps) {
+  onQueryChange,
+  renderItem,
+}: ComboboxProps<T>) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const inputRef = useRef<TextInput>(null);
 
+  // When `onQueryChange` is provided, the parent owns filtering (server-side
+  // search) and we should display whatever `items` it sends back. Otherwise
+  // keep the original client-side label filter so existing callers don't break.
   const filtered = useMemo(() => {
+    if (onQueryChange) return items;
     const q = query.trim().toLowerCase();
     if (!q) return items;
     return items.filter((i) => i.label.toLowerCase().includes(q));
-  }, [items, query]);
+  }, [items, query, onQueryChange]);
 
   const selectedItems = items.filter((i) => selectedIds.includes(i.id));
 
@@ -73,6 +93,7 @@ export function Combobox({
 
   const handleChangeText = (text: string) => {
     setQuery(text);
+    onQueryChange?.(text);
     if (!open) setOpen(true);
     if (!multiple && selectedIds.length > 0) {
       onChangeSelectedIds([]);
@@ -107,7 +128,7 @@ export function Combobox({
     : query;
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, open && styles.wrapperOpen]}>
       {/* Full-screen backdrop — closes dropdown on outside tap (skip inside sheets/ScrollViews) */}
       {open && !noBackdrop && (
         <TouchableOpacity
@@ -147,6 +168,7 @@ export function Combobox({
           <TouchableOpacity
             onPress={() => {
               setQuery('');
+              onQueryChange?.('');
               onChangeSelectedIds([]);
               setOpen(false);
               inputRef.current?.blur();
@@ -228,44 +250,55 @@ export function Combobox({
             ) : (
               filtered.map((item, index) => {
                 const selected = selectedIds.includes(item.id);
+                const onSelect = () => toggle(item.id);
                 return (
                   <View key={item.id}>
-                    <TouchableOpacity
-                      style={[styles.row, selected && styles.rowSelected]}
-                      onPress={() => toggle(item.id)}
-                      activeOpacity={0.65}
-                    >
-                      {item.color ? (
-                        <View style={[styles.dot, { backgroundColor: item.color }]} />
-                      ) : null}
-                      <ThemedText
-                        type="body"
-                        color={selected ? (item.color ?? colors.primary500) : colors.textPrimary}
-                        style={[styles.rowLabel, selected && styles.rowLabelSelected]}
-                        numberOfLines={1}
+                    {renderItem ? (
+                      <TouchableOpacity
+                        style={[styles.row, selected && styles.rowSelected]}
+                        onPress={onSelect}
+                        activeOpacity={0.65}
                       >
-                        {item.label}
-                      </ThemedText>
-                      {multiple ? (
-                        <View
-                          style={[
-                            styles.checkbox,
-                            selected && {
-                              backgroundColor: item.color ?? colors.primary500,
-                              borderColor: item.color ?? colors.primary500,
-                            },
-                          ]}
+                        {renderItem({ item, selected, onSelect })}
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.row, selected && styles.rowSelected]}
+                        onPress={onSelect}
+                        activeOpacity={0.65}
+                      >
+                        {item.color ? (
+                          <View style={[styles.dot, { backgroundColor: item.color }]} />
+                        ) : null}
+                        <ThemedText
+                          type="body"
+                          color={selected ? (item.color ?? colors.primary500) : colors.textPrimary}
+                          style={[styles.rowLabel, selected && styles.rowLabelSelected]}
+                          numberOfLines={1}
                         >
-                          {selected && (
-                            <Ionicons name="checkmark" size={10} color={colors.textInverse} />
-                          )}
-                        </View>
-                      ) : (
-                        selected && (
-                          <Ionicons name="checkmark" size={16} color={colors.primary500} />
-                        )
-                      )}
-                    </TouchableOpacity>
+                          {item.label}
+                        </ThemedText>
+                        {multiple ? (
+                          <View
+                            style={[
+                              styles.checkbox,
+                              selected && {
+                                backgroundColor: item.color ?? colors.primary500,
+                                borderColor: item.color ?? colors.primary500,
+                              },
+                            ]}
+                          >
+                            {selected && (
+                              <Ionicons name="checkmark" size={10} color={colors.textInverse} />
+                            )}
+                          </View>
+                        ) : (
+                          selected && (
+                            <Ionicons name="checkmark" size={16} color={colors.primary500} />
+                          )
+                        )}
+                      </TouchableOpacity>
+                    )}
                     {index < filtered.length - 1 && <View style={styles.sep} />}
                   </View>
                 );
@@ -294,6 +327,10 @@ export function Combobox({
 
 const styles = StyleSheet.create({
   wrapper: { gap: spacing[2] },
+  // When open, lift the whole picker above following siblings on both iOS
+  // (zIndex) and Android (elevation). Without this, the next card in the
+  // ScrollView would paint over the dropdown.
+  wrapperOpen: { zIndex: 1000, elevation: 20 },
 
   // Full-screen transparent overlay — catches outside taps
   backdrop: {
@@ -366,7 +403,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard,
     overflow: 'hidden',
     zIndex: 999,
-    elevation: 8,
     ...shadows.md,
   },
 

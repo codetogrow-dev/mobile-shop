@@ -1,6 +1,13 @@
 import { supabase } from '@/lib/supabase';
 import type { SaleFormValues, SaleFilters } from '@/types/app';
-import { TRANSACTION_SORT } from '@/constants/enums';
+import { TRANSACTION_SORT, PAYMENT_MODE, PAYMENT_STATUS_FILTER } from '@/constants/enums';
+
+function initialPaymentFor(values: SaleFormValues): number | null {
+  const total = Number(values.quantity) * Number(values.sale_price_per_unit);
+  if (values.payment_mode === PAYMENT_MODE.FULL)    return total;
+  if (values.payment_mode === PAYMENT_MODE.UNPAID)  return 0;
+  return Number(values.amount_paid ?? 0);
+}
 
 export async function createSale(values: SaleFormValues & { tenant_id: string }) {
   const { data, error } = await supabase.rpc('record_sale', {
@@ -10,6 +17,9 @@ export async function createSale(values: SaleFormValues & { tenant_id: string })
     p_notes: values.notes ?? null,
     p_sold_at: values.sold_at,
     p_tenant_id: values.tenant_id,
+    p_customer_id: values.customer_id ?? null,
+    p_initial_payment: initialPaymentFor(values),
+    p_due_date: values.due_date ?? null,
   });
   if (error) throw error;
   return data;
@@ -19,7 +29,7 @@ export async function listSales(productId?: string, filters?: Partial<SaleFilter
   const { data: { user } } = await supabase.auth.getUser();
   let query = supabase
     .from('sales')
-    .select(`*, products(id, name)`)
+    .select(`*, products(id, name), customers(id, name, phone)`)
     .eq('user_id', user?.id)
     .order('sold_at', { ascending: false });
 
@@ -27,6 +37,14 @@ export async function listSales(productId?: string, filters?: Partial<SaleFilter
   if (filters?.productId) query = query.eq('product_id', filters.productId);
   if (filters?.dateFrom) query = query.gte('sold_at', filters.dateFrom);
   if (filters?.dateTo) query = query.lte('sold_at', filters.dateTo + 'T23:59:59');
+  switch (filters?.paymentStatus) {
+    case PAYMENT_STATUS_FILTER.PAID:    query = query.eq('payment_status', 'paid'); break;
+    case PAYMENT_STATUS_FILTER.PARTIAL: query = query.eq('payment_status', 'partial'); break;
+    case PAYMENT_STATUS_FILTER.UNPAID:  query = query.eq('payment_status', 'unpaid'); break;
+    case PAYMENT_STATUS_FILTER.OVERDUE:
+      query = query.gt('balance_due', 0).not('due_date', 'is', null).lt('due_date', new Date().toISOString().slice(0, 10));
+      break;
+  }
   switch (filters?.sortBy) {
     case TRANSACTION_SORT.AMOUNT_DESC: query = query.order('total_revenue', { ascending: false }); break;
     case TRANSACTION_SORT.AMOUNT_ASC:  query = query.order('total_revenue', { ascending: true });  break;
@@ -42,7 +60,7 @@ export async function listSalesByDateRange(from: string, to: string) {
   const { data: { user } } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('sales')
-    .select(`*, products(id, name)`)
+    .select(`*, products(id, name), customers(id, name)`)
     .eq('user_id', user?.id)
     .gte('sold_at', from)
     .lte('sold_at', to + 'T23:59:59')
@@ -55,7 +73,7 @@ export async function getSale(id: string) {
   const { data: { user } } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('sales')
-    .select(`*, products(id, name)`)
+    .select(`*, products(id, name), customers(id, name, phone, cnic, address)`)
     .eq('id', id)
     .eq('user_id', user?.id)
     .single();
@@ -63,7 +81,17 @@ export async function getSale(id: string) {
   return data;
 }
 
-export async function updateSale(id: string, values: { quantity: number; sale_price_per_unit: number; notes?: string | null; sold_at: string }) {
+export async function updateSale(
+  id: string,
+  values: {
+    quantity?: number;
+    sale_price_per_unit?: number;
+    notes?: string | null;
+    sold_at?: string;
+    customer_id?: string | null;
+    due_date?: string | null;
+  },
+) {
   const { data, error } = await supabase
     .from('sales')
     .update(values)

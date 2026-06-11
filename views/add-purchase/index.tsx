@@ -12,12 +12,22 @@ import { ThemedText } from '@/components/themed-text';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Combobox } from '@/components/ui/combobox';
+import { PersonPicker } from '@/components/ui/person-picker';
+import { PaymentSection } from '@/components/ui/payment-section';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
 import { purchaseSchema, type PurchaseFormValues } from '@/types/app';
 import { createPurchase } from '@/api/purchases';
 import { listProducts } from '@/api/products';
 import { QK } from '@/constants/query-keys';
 import { useAuthStore } from '@/store/auth-store';
+import { PAYMENT_MODE } from '@/constants/enums';
+
+interface ProductItem {
+  id: string;
+  label: string;
+  current_stock: number;
+}
 
 export default function AddPurchaseView() {
   const insets = useSafeAreaInsets();
@@ -30,18 +40,37 @@ export default function AddPurchaseView() {
     queryFn: () => listProducts({ search: productSearch }),
   });
 
-  const { control, handleSubmit, formState: { errors }, watch, setValue } = useForm<PurchaseFormValues, any, PurchaseFormValues>({
-    resolver: zodResolver(purchaseSchema) as any,
-    defaultValues: {
-      product_id: '',
-      quantity: 1,
-      cost_price: 0,
-      selling_price: 0,
-      purchased_at: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
-    },
-  });
+  const productItems: ProductItem[] = (products ?? []).map((p) => ({
+    id: p.id,
+    label: p.name,
+    current_stock: Number(p.current_stock),
+  }));
 
+  const { control, handleSubmit, formState: { errors }, watch, setValue } =
+    useForm<PurchaseFormValues, any, PurchaseFormValues>({
+      resolver: zodResolver(purchaseSchema) as any,
+      defaultValues: {
+        product_id: '',
+        quantity: 1,
+        cost_price: 0,
+        selling_price: 0,
+        purchased_at: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+        payment_mode: PAYMENT_MODE.FULL,
+        supplier_id: null,
+        due_date: null,
+      } as any,
+    });
+
+  const [pickerOpen, setPickerOpen] = useState(false);
   const selectedProductId = watch('product_id');
+  const quantity          = Number(watch('quantity'))   || 0;
+  const costPrice         = Number(watch('cost_price')) || 0;
+  const total             = quantity * costPrice;
+  const paymentMode       = watch('payment_mode');
+  const amountPaidStr     = String(watch('amount_paid') ?? '');
+  const dueDate           = (watch('due_date') as string | null) ?? null;
+  const supplierId        = (watch('supplier_id') as string | null) ?? null;
+
   const selectedProduct = products?.find((p) => p.id === selectedProductId);
 
   const mutation = useMutation({
@@ -50,6 +79,8 @@ export default function AddPurchaseView() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.products.all });
       qc.invalidateQueries({ queryKey: QK.purchases.all });
+      qc.invalidateQueries({ queryKey: QK.dues.all });
+      qc.invalidateQueries({ queryKey: QK.suppliers.all });
       router.back();
     },
   });
@@ -77,13 +108,39 @@ export default function AddPurchaseView() {
           )}
 
           {/* Product Picker */}
-          <Card>
+          <Card style={pickerOpen ? styles.productCardElevated : undefined}>
             <ThemedText type="h4" style={styles.sectionTitle}>Select Product</ThemedText>
-            <Input
+            <Combobox<ProductItem>
+              items={productItems}
+              selectedIds={selectedProductId ? [selectedProductId] : []}
+              onChangeSelectedIds={(ids) =>
+                setValue('product_id', ids[0] ?? '', { shouldValidate: true })
+              }
               placeholder="Search products…"
-              value={productSearch}
-              onChangeText={setProductSearch}
-              leftIcon={<Ionicons name="search" size={16} color={colors.textTertiary} />}
+              multiple={false}
+              noBackdrop
+              onOpenChange={setPickerOpen}
+              onQueryChange={setProductSearch}
+              renderItem={({ item, selected }) => (
+                <View style={styles.productRowInner}>
+                  <View style={styles.productRowInfo}>
+                    <ThemedText
+                      type="body"
+                      color={selected ? colors.primary600 : colors.textPrimary}
+                      style={selected ? { fontWeight: '700' } : undefined}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </ThemedText>
+                    <ThemedText type="caption" color={colors.textTertiary}>
+                      Current stock: {item.current_stock}
+                    </ThemedText>
+                  </View>
+                  {selected && (
+                    <Ionicons name="checkmark-circle" size={18} color={colors.primary500} />
+                  )}
+                </View>
+              )}
             />
             {selectedProduct && (
               <View style={styles.selectedProduct}>
@@ -94,30 +151,10 @@ export default function AddPurchaseView() {
                 </ThemedText>
               </View>
             )}
-            <View style={styles.productList}>
-              {products?.slice(0, 6).map((p) => (
-                <TouchableOpacity
-                  key={p.id}
-                  style={[styles.productRow, selectedProductId === p.id && styles.productRowActive]}
-                  onPress={() => setValue('product_id', p.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.productRowInfo}>
-                    <ThemedText type="body" color={selectedProductId === p.id ? colors.primary600 : colors.textPrimary}>
-                      {p.name}
-                    </ThemedText>
-                    <ThemedText type="caption" color={colors.textTertiary}>
-                      Current stock: {p.current_stock}
-                    </ThemedText>
-                  </View>
-                  {selectedProductId === p.id && (
-                    <Ionicons name="checkmark-circle" size={18} color={colors.primary500} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
             {errors.product_id && (
-              <ThemedText type="caption" color={colors.danger}>{errors.product_id.message}</ThemedText>
+              <ThemedText type="caption" color={colors.danger} style={{ marginTop: spacing[2] }}>
+                {errors.product_id.message}
+              </ThemedText>
             )}
           </Card>
 
@@ -174,19 +211,6 @@ export default function AddPurchaseView() {
 
             <Controller
               control={control}
-              name="supplier"
-              render={({ field }) => (
-                <Input
-                  label="Supplier (optional)"
-                  placeholder="Supplier name"
-                  value={field.value ?? ''}
-                  onChangeText={field.onChange}
-                />
-              )}
-            />
-
-            <Controller
-              control={control}
               name="notes"
               render={({ field }) => (
                 <Input
@@ -201,8 +225,43 @@ export default function AddPurchaseView() {
             />
           </Card>
 
+          {/* Supplier */}
+          <Card>
+            <ThemedText type="h4" style={styles.sectionTitle}>Supplier</ThemedText>
+            <PersonPicker
+              kind="supplier"
+              value={supplierId}
+              onChange={(id) => setValue('supplier_id', id, { shouldValidate: true })}
+              error={errors.supplier_id?.message}
+              required={paymentMode !== PAYMENT_MODE.FULL}
+            />
+          </Card>
+
+          {/* Payment */}
+          <Card>
+            <ThemedText type="h4" style={styles.sectionTitle}>Payment</ThemedText>
+            <PaymentSection
+              total={total}
+              mode={paymentMode}
+              onModeChange={(m) => setValue('payment_mode', m, { shouldValidate: true })}
+              amountPaidStr={amountPaidStr}
+              onAmountPaidChange={(v) => setValue('amount_paid', v as any, { shouldValidate: true })}
+              amountPaidError={errors.amount_paid?.message}
+              dueDate={dueDate}
+              onDueDateChange={(v) => setValue('due_date', v, { shouldValidate: true })}
+              dueDateError={errors.due_date?.message as string | undefined}
+              partyLabel="supplier"
+            />
+          </Card>
+
           <Button
-            label="Record Purchase"
+            label={
+              paymentMode === PAYMENT_MODE.FULL
+                ? 'Record Purchase'
+                : paymentMode === PAYMENT_MODE.UNPAID
+                  ? 'Record on Credit'
+                  : 'Record Partial Purchase'
+            }
             onPress={handleSubmit((v) => mutation.mutate(v))}
             loading={mutation.isPending}
             fullWidth
@@ -256,21 +315,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.successBg,
     borderRadius: radius.sm,
   },
-  productList: { marginTop: spacing[3], gap: spacing[2] },
-  productRow: {
+  productRowInner: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[3],
-    borderRadius: radius.md,
-    backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: spacing[3],
   },
-  productRowActive: {
-    borderColor: colors.primary300,
-    backgroundColor: colors.primary50,
-  },
-  productRowInfo: { gap: 2 },
+  productRowInfo: { flex: 1, gap: 2 },
+  // Raised above the next Card while the dropdown is open so it doesn't get
+  // covered. Higher than the next sibling's default elevation/zIndex.
+  productCardElevated: { zIndex: 100, elevation: 12 },
 });
