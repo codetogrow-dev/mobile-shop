@@ -37,15 +37,25 @@ export const QK = {
     all: ['customers'] as const,
     list: (search?: string) => ['customers', 'list', search ?? ''] as const,
     detail: (id: string) => ['customers', 'detail', id] as const,
+    page: (search: string, sort: string) =>
+      ['customers', 'page', search, sort] as const,
+    stats: (id: string) => ['customers', 'stats', id] as const,
+    dashboardSummary: ['customers', 'dashboard-summary'] as const,
   },
   suppliers: {
     all: ['suppliers'] as const,
     list: (search?: string) => ['suppliers', 'list', search ?? ''] as const,
     detail: (id: string) => ['suppliers', 'detail', id] as const,
+    page: (search: string, sort: string) =>
+      ['suppliers', 'page', search, sort] as const,
+    stats: (id: string) => ['suppliers', 'stats', id] as const,
+    dashboardSummary: ['suppliers', 'dashboard-summary'] as const,
   },
   payments: {
     byTransaction: (type: 'sale' | 'purchase', id: string) =>
       ['payments', type, id] as const,
+    byCustomer: (customerId: string) => ['payments', 'customer', customerId] as const,
+    bySupplier: (supplierId: string) => ['payments', 'supplier', supplierId] as const,
   },
   dues: {
     all: ['dues'] as const,

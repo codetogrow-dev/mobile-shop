@@ -6,9 +6,9 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
 
 import { ThemedText } from '@/components/themed-text';
+import { nowKarachiISO } from '@/lib/datetime';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -54,7 +54,9 @@ export default function AddPurchaseView() {
         quantity: 1,
         cost_price: 0,
         selling_price: 0,
-        purchased_at: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+        // Karachi-stamped ISO so Postgres timestamptz stores the real local
+        // moment regardless of the device timezone.
+        purchased_at: nowKarachiISO(),
         payment_mode: PAYMENT_MODE.FULL,
         supplier_id: null,
         due_date: null,

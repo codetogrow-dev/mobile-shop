@@ -4,11 +4,10 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
 
 import { ThemedText } from '@/components/themed-text';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
-import { fmtCurrency, fmtPct } from '@/lib/format-num';
+import { fmtCurrency, fmtRupeeCompact, fmtPct } from '@/lib/format-num';
 import { StatInfoModal } from '@/components/ui/stat-info-modal';
 import { QK } from '@/constants/query-keys';
 import { STOCK_FILTER } from '@/constants/enums';
@@ -21,8 +20,8 @@ import { KPIRow } from './kpi-row';
 import { LowStockList } from './low-stock-list';
 import { SparklineCard } from './sparkline-card';
 import { OverdueBanner } from '@/views/dues/overdue-banner';
-
-const today = format(new Date(), 'yyyy-MM-dd');
+import { PeopleWidget } from './people-widget';
+import { fmtKarachi, todayKarachi } from '@/lib/datetime';
 
 const QUICK_ACTIONS = [
   { label: 'Add Sale', icon: 'receipt-outline', color: colors.primary500, route: '/(app)/add-sale' },
@@ -33,6 +32,7 @@ const QUICK_ACTIONS = [
 
 export default function DashboardView() {
   const insets = useSafeAreaInsets();
+  const today = todayKarachi();
 
   const { data: daily, isLoading: dailyLoading, refetch: refetchDaily } = useQuery({
     queryKey: QK.reports.daily(today),
@@ -105,7 +105,7 @@ export default function DashboardView() {
       <View style={styles.header}>
         <View>
           <ThemedText type="caption" color={colors.textSecondary}>
-            {format(new Date(), 'EEEE, dd MMM')}
+            {fmtKarachi(new Date(), 'EEEE, dd MMM')}
           </ThemedText>
           <ThemedText type="h2">Dashboard</ThemedText>
         </View>
@@ -235,6 +235,9 @@ export default function DashboardView() {
           ]}
         />
 
+        {/* ── People (customers + suppliers analytics) ── */}
+        <PeopleWidget />
+
         {/* ── Modals ── */}
         <StatInfoModal visible={infoModal === 'revenue'} onClose={() => setInfoModal(null)} label="Today's Revenue" description="Total money collected from all sales recorded today." value={dailyRevenue} icon="cash-outline" accentColor={colors.primary500} accentBg={colors.primary50} />
         <StatInfoModal visible={infoModal === 'profit'} onClose={() => setInfoModal(null)} label="Today's Profit" description="Gross profit for today — revenue minus cost of goods (FIFO)." value={dailyProfit} icon="trending-up-outline" accentColor={dailyProfit >= 0 ? colors.success : colors.danger} accentBg={dailyProfit >= 0 ? colors.successBg : colors.dangerBg} />
@@ -297,7 +300,7 @@ export default function DashboardView() {
                   </View>
                   <ThemedText type="body" style={styles.topName} numberOfLines={1}>{p.name}</ThemedText>
                   <ThemedText type="caption" color={colors.textTertiary}>{p.units_sold} sold</ThemedText>
-                  <ThemedText type="numericSm" color={colors.accent}>{fmtCurrency(p.revenue)}</ThemedText>
+                  <ThemedText type="numericSm" color={colors.accent}>{fmtRupeeCompact(p.revenue)}</ThemedText>
                 </View>
               ))}
             </View>

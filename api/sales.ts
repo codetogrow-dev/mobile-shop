@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { SaleFormValues, SaleFilters } from '@/types/app';
 import { TRANSACTION_SORT, PAYMENT_MODE, PAYMENT_STATUS_FILTER } from '@/constants/enums';
+import { fmtKarachi } from '@/lib/datetime';
 
 function initialPaymentFor(values: SaleFormValues): number | null {
   const total = Number(values.quantity) * Number(values.sale_price_per_unit);
@@ -41,9 +42,13 @@ export async function listSales(productId?: string, filters?: Partial<SaleFilter
     case PAYMENT_STATUS_FILTER.PAID:    query = query.eq('payment_status', 'paid'); break;
     case PAYMENT_STATUS_FILTER.PARTIAL: query = query.eq('payment_status', 'partial'); break;
     case PAYMENT_STATUS_FILTER.UNPAID:  query = query.eq('payment_status', 'unpaid'); break;
-    case PAYMENT_STATUS_FILTER.OVERDUE:
-      query = query.gt('balance_due', 0).not('due_date', 'is', null).lt('due_date', new Date().toISOString().slice(0, 10));
+    case PAYMENT_STATUS_FILTER.OVERDUE: {
+      // Compare against today's Karachi-local date so overdue thresholds
+      // match the user's wall clock.
+      const todayKr = fmtKarachi(new Date(), 'yyyy-MM-dd');
+      query = query.gt('balance_due', 0).not('due_date', 'is', null).lt('due_date', todayKr);
       break;
+    }
   }
   switch (filters?.sortBy) {
     case TRANSACTION_SORT.AMOUNT_DESC: query = query.order('total_revenue', { ascending: false }); break;

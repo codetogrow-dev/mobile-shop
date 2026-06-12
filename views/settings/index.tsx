@@ -1,16 +1,22 @@
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
+import { router } from "expo-router";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ThemedText } from '@/components/themed-text';
-import { Card } from '@/components/ui/card';
-import { colors, spacing, radius, shadows } from '@/constants/theme';
-import { useAuthStore } from '@/store/auth-store';
-import { signOut } from '@/api/auth';
-import { QK } from '@/constants/query-keys';
-import { getOverdueCount } from '@/api/dues';
+import { signOut } from "@/api/auth";
+import { getOverdueCount } from "@/api/dues";
+import { ThemedText } from "@/components/themed-text";
+import { Card } from "@/components/ui/card";
+import { QK } from "@/constants/query-keys";
+import { colors, radius, shadows, spacing } from "@/constants/theme";
+import { useAuthStore } from "@/store/auth-store";
 
 function SettingRow({
   icon,
@@ -35,20 +41,43 @@ function SettingRow({
       disabled={!onPress}
     >
       <View style={[styles.settingIcon, danger && styles.settingIconDanger]}>
-        <Ionicons name={icon} size={18} color={danger ? colors.danger : colors.primary500} />
+        <Ionicons
+          name={icon}
+          size={18}
+          color={danger ? colors.danger : colors.primary500}
+        />
       </View>
       <View style={styles.settingInfo}>
-        <ThemedText type="body" color={danger ? colors.danger : colors.textPrimary}>{label}</ThemedText>
-        {value && <ThemedText type="caption" color={colors.textTertiary}>{value}</ThemedText>}
+        <ThemedText
+          type="body"
+          color={danger ? colors.danger : colors.textPrimary}
+        >
+          {label}
+        </ThemedText>
+        {value && (
+          <ThemedText type="caption" color={colors.textTertiary}>
+            {value}
+          </ThemedText>
+        )}
       </View>
       {badge !== undefined && badge > 0 && (
         <View style={styles.badge}>
-          <ThemedText type="overline" color={colors.textInverse} style={{ fontSize: 10 }}>
+          <ThemedText
+            type="overline"
+            color={colors.textInverse}
+            style={{ fontSize: 10 }}
+          >
             {badge}
           </ThemedText>
         </View>
       )}
-      {onPress && <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />}
+      {onPress && (
+        <Ionicons
+          name="chevron-forward"
+          size={16}
+          color={colors.textTertiary}
+        />
+      )}
     </TouchableOpacity>
   );
 }
@@ -62,18 +91,19 @@ export default function SettingsView() {
     queryFn: getOverdueCount,
     staleTime: 60_000,
   });
-  const overdueTotal = (overdue?.receivables_overdue ?? 0) + (overdue?.payables_overdue ?? 0);
+  const overdueTotal =
+    (overdue?.receivables_overdue ?? 0) + (overdue?.payables_overdue ?? 0);
 
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
       {
-        text: 'Sign Out',
-        style: 'destructive',
+        text: "Sign Out",
+        style: "destructive",
         onPress: async () => {
           await signOut().catch(() => {});
           clearSession();
-          router.replace('/(auth)/login');
+          router.replace("/(auth)/login");
         },
       },
     ]);
@@ -92,8 +122,12 @@ export default function SettingsView() {
             <Ionicons name="person" size={32} color={colors.primary500} />
           </View>
           <View>
-            <ThemedText type="h3">{user?.user_metadata?.full_name ?? 'Shop Owner'}</ThemedText>
-            <ThemedText type="body" color={colors.textSecondary}>{user?.email}</ThemedText>
+            <ThemedText type="h3">
+              {user?.user_metadata?.full_name ?? "Shop Owner"}
+            </ThemedText>
+            <ThemedText type="body" color={colors.textSecondary}>
+              {user?.email}
+            </ThemedText>
           </View>
         </View>
 
@@ -104,14 +138,31 @@ export default function SettingsView() {
             label="Dues"
             value="Receivables & payables"
             badge={overdueTotal}
-            onPress={() => router.push('/(app)/(tabs)/dues' as any)}
+            onPress={() => router.push("/(app)/(tabs)/dues" as any)}
           />
           <View style={styles.separator} />
           <SettingRow
             icon="bar-chart-outline"
             label="Reports"
             value="Revenue, profit & analytics"
-            onPress={() => router.push('/(app)/(tabs)/reports' as any)}
+            onPress={() => router.push("/(app)/(tabs)/reports" as any)}
+          />
+        </Card>
+
+        {/* People */}
+        <Card padded={false}>
+          <SettingRow
+            icon="people-outline"
+            label="Customers"
+            value="Visitors, spend & loyalty"
+            onPress={() => router.push("/(app)/customers" as any)}
+          />
+          <View style={styles.separator} />
+          <SettingRow
+            icon="business-outline"
+            label="Suppliers"
+            value="Vendors & purchase history"
+            onPress={() => router.push("/(app)/suppliers" as any)}
           />
         </Card>
 
@@ -121,15 +172,23 @@ export default function SettingsView() {
             icon="pricetag-outline"
             label="Categories"
             value="Manage product categories"
-            onPress={() => router.push('/(app)/(tabs)/settings/categories')}
+            onPress={() => router.push("/(app)/(tabs)/settings/categories")}
           />
         </Card>
 
         {/* App Info */}
         <Card padded={false}>
-          <SettingRow icon="information-circle-outline" label="App Version" value="1.0.0" />
+          <SettingRow
+            icon="information-circle-outline"
+            label="App Version"
+            value="1.0.0"
+          />
           <View style={styles.separator} />
-          <SettingRow icon="storefront-outline" label="Business" value="Mobile Shop" />
+          <SettingRow
+            icon="storefront-outline"
+            label="Business"
+            value="Mobile Shop"
+          />
         </Card>
 
         {/* Sign Out */}
@@ -153,10 +212,14 @@ const styles = StyleSheet.create({
     paddingTop: spacing[4],
     paddingBottom: spacing[3],
   },
-  content: { paddingHorizontal: spacing[5], gap: spacing[4], paddingBottom: spacing[10] },
+  content: {
+    paddingHorizontal: spacing[5],
+    gap: spacing[4],
+    paddingBottom: spacing[10],
+  },
   profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing[4],
     backgroundColor: colors.bgCard,
     borderRadius: radius.xl,
@@ -172,12 +235,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary50,
     borderWidth: 2,
     borderColor: colors.primary200,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing[3],
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[4],
@@ -187,21 +250,25 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: radius.sm,
     backgroundColor: colors.primary50,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   settingIconDanger: {
     backgroundColor: colors.dangerBg,
   },
   settingInfo: { flex: 1 },
-  separator: { height: 1, backgroundColor: colors.border, marginHorizontal: spacing[4] },
+  separator: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing[4],
+  },
   badge: {
     minWidth: 20,
     height: 20,
     borderRadius: 10,
     backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 6,
     marginRight: spacing[2],
   },

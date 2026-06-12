@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { fmtKarachi } from '@/lib/datetime';
 
 import { ThemedText } from '@/components/themed-text';
 import { Badge } from '@/components/ui/badge';
@@ -205,7 +205,7 @@ export default function ProductDetailView() {
             )}
             <InfoRow
               label="Added"
-              value={format(new Date(product.created_at), 'dd MMM yyyy')}
+              value={fmtKarachi(product.created_at, 'dd MMM yyyy')}
             />
           </Card>
 

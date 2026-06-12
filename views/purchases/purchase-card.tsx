@@ -1,10 +1,10 @@
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { format, parseISO } from 'date-fns';
 import { ThemedText } from '@/components/themed-text';
 import { PaymentStatusBadge } from '@/components/ui/payment-status-badge';
 import { colors, spacing, radius } from '@/constants/theme';
 import { fmtCurrency, fmtPct } from '@/lib/format-num';
+import { fmtKarachi } from '@/lib/datetime';
 import type { PaymentStatus } from '@/types/app';
 
 export interface PurchaseCardData {
@@ -48,7 +48,7 @@ export function PurchaseCard({ item, showProduct = true, onPress }: { item: Purc
             <ThemedText type="h4" numberOfLines={1}>{item.products.name}</ThemedText>
           ) : null}
           <ThemedText type="caption" color={colors.textTertiary}>
-            {format(new Date(item.purchased_at), 'dd MMM yyyy · hh:mm a')}
+            {fmtKarachi(item.purchased_at, 'dd MMM yyyy · hh:mm a')}
           </ThemedText>
           {supplierName ? (
             <View style={styles.supplierRow}>
@@ -67,7 +67,7 @@ export function PurchaseCard({ item, showProduct = true, onPress }: { item: Purc
           <View style={styles.dueRowLeft}>
             <Ionicons name="time-outline" size={13} color={overdue ? colors.danger : colors.warning} />
             <ThemedText type="caption" color={overdue ? colors.danger : colors.textSecondary}>
-              {item.due_date ? `Due ${format(parseISO(item.due_date), 'dd MMM')}` : 'No due date'}
+              {item.due_date ? `Due ${fmtKarachi(item.due_date, 'dd MMM')}` : 'No due date'}
             </ThemedText>
           </View>
           <ThemedText type="caption" color={overdue ? colors.danger : colors.textPrimary} style={{ fontWeight: '700' }}>

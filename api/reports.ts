@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { fmtKarachi } from '@/lib/datetime';
 import type {
   DailySummary, MonthlySummary, YearlySummary,
   ProductSummary, WeeklyRevenuePoint, TopProduct, MonthlyBreakdownRow,
@@ -149,11 +150,13 @@ export async function getProductSummary(productId: string): Promise<ProductSumma
 
 export async function getWeeklyRevenue(): Promise<WeeklyRevenuePoint[]> {
   const uid = await getUid();
+  // Build the last 7 Karachi-local dates (yyyy-MM-dd) so the bar labels and
+  // the date-column lookup agree with the user's wall clock in Karachi.
   const dates: string[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    dates.push(d.toISOString().split('T')[0]);
+    dates.push(fmtKarachi(d, 'yyyy-MM-dd'));
   }
 
   const { data, error } = await supabase
@@ -259,9 +262,11 @@ export async function getOutOfStockCount(): Promise<number> {
 
 export async function getMonthToDateSummary(): Promise<{ revenue: number; profit: number; units_sold: number; active_days: number }> {
   const uid = await getUid();
-  const now = new Date();
-  const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-  const to = now.toISOString().split('T')[0];
+  // Karachi-anchored month boundaries so MTD windows align with the user's
+  // wall clock, not the device timezone.
+  const todayKr = fmtKarachi(new Date(), 'yyyy-MM-dd');
+  const from = `${todayKr.slice(0, 7)}-01`;
+  const to = todayKr;
 
   const { data: daily, error: dailyError } = await supabase
     .from('daily_sales_summary')
@@ -280,8 +285,8 @@ export async function getMonthToDateSummary(): Promise<{ revenue: number; profit
     .from('sales')
     .select('quantity')
     .eq('user_id', uid)
-    .gte('sold_at', `${from}T00:00:00`)
-    .lte('sold_at', `${to}T23:59:59`);
+    .gte('sold_at', `${from}T00:00:00+05:00`)
+    .lte('sold_at', `${to}T23:59:59+05:00`);
   if (salesError) throw salesError;
 
   const units_sold = (salesData ?? []).reduce((s, r) => s + r.quantity, 0);
@@ -292,7 +297,7 @@ export async function getYesterdaySummary(): Promise<{ revenue: number; profit: 
   const uid = await getUid();
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  const yesterday = d.toISOString().split('T')[0];
+  const yesterday = fmtKarachi(d, 'yyyy-MM-dd');
 
   const { data, error } = await supabase
     .from('daily_sales_summary')

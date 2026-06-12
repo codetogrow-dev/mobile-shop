@@ -1,9 +1,9 @@
 import { ThemedText } from "@/components/themed-text";
 import { PaymentStatusBadge } from "@/components/ui/payment-status-badge";
 import { colors, radius, spacing } from "@/constants/theme";
-import { fmtCurrency } from "@/lib/format-num";
+import { fmtRupeeCompact } from "@/lib/format-num";
+import { fmtKarachi } from "@/lib/datetime";
 import { Ionicons } from "@expo/vector-icons";
-import { format, parseISO } from "date-fns";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import type { PaymentStatus } from "@/types/app";
 
@@ -67,7 +67,7 @@ export function SaleCard({
             </ThemedText>
           ) : null}
           <ThemedText type="caption" color={colors.textTertiary}>
-            {format(new Date(item.sold_at), "dd MMM yyyy · hh:mm a")}
+            {fmtKarachi(item.sold_at, "dd MMM yyyy · hh:mm a")}
           </ThemedText>
           {customerName ? (
             <View style={styles.customerRow}>
@@ -84,7 +84,7 @@ export function SaleCard({
               color={colors.primary500}
               style={{ fontWeight: "700" }}
             >
-              {fmtCurrency(revenue)}
+              {fmtRupeeCompact(revenue)}
             </ThemedText>
           </View>
           {status && (
@@ -106,7 +106,7 @@ export function SaleCard({
               color={overdue ? colors.danger : colors.textSecondary}
             >
               {item.due_date
-                ? `Due ${format(parseISO(item.due_date), "dd MMM")}`
+                ? `Due ${fmtKarachi(item.due_date, "dd MMM")}`
                 : "No due date"}
             </ThemedText>
           </View>
@@ -115,7 +115,7 @@ export function SaleCard({
             color={overdue ? colors.danger : colors.textPrimary}
             style={{ fontWeight: "700" }}
           >
-            {fmtCurrency(balance)} due
+            {fmtRupeeCompact(balance)} due
           </ThemedText>
         </View>
       )}
@@ -128,25 +128,25 @@ export function SaleCard({
         <MetricCell label="Qty Sold" value={`${item.quantity} units`} />
         <MetricCell
           label="Sale Price / unit"
-          value={fmtCurrency(Number(item.sale_price_per_unit))}
+          value={fmtRupeeCompact(Number(item.sale_price_per_unit))}
         />
         {item.cost_price_per_unit != null && (
           <MetricCell
             label="Cost / unit"
-            value={fmtCurrency(Number(item.cost_price_per_unit))}
+            value={fmtRupeeCompact(Number(item.cost_price_per_unit))}
           />
         )}
         {cost > 0 && (
-          <MetricCell label="Total Cost" value={fmtCurrency(cost)} />
+          <MetricCell label="Total Cost" value={fmtRupeeCompact(cost)} />
         )}
         <MetricCell
           label="Total Revenue"
-          value={fmtCurrency(revenue)}
+          value={fmtRupeeCompact(revenue)}
           valueColor={colors.accent}
         />
         <MetricCell
           label={`Margin (${marginPct}%)`}
-          value={fmtCurrency(profit, true)}
+          value={fmtRupeeCompact(profit, true)}
           valueColor={isProfit ? colors.success : colors.danger}
         />
       </View>
@@ -162,7 +162,7 @@ export function SaleCard({
           Gross Profit
         </ThemedText>
         <ThemedText type="h4" color={isProfit ? colors.success : colors.danger}>
-          {fmtCurrency(profit, true)}
+          {fmtRupeeCompact(profit, true)}
         </ThemedText>
       </View>
 

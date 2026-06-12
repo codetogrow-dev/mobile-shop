@@ -1,27 +1,34 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { format, parseISO } from 'date-fns';
 
 import { ThemedText } from '@/components/themed-text';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { PaymentStatusBadge } from '@/components/ui/payment-status-badge';
+import { StatInfoModal } from '@/components/ui/stat-info-modal';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
-import { fmtCurrency } from '@/lib/format-num';
+import { fmtCurrency, fmtRupee, fmtRupeeCompact } from '@/lib/format-num';
+import { fmtKarachi } from '@/lib/datetime';
 import { QK } from '@/constants/query-keys';
+import { KpiGrid, type KpiItem } from '@/components/ui/kpi-grid';
 
-import { getCustomer } from '@/api/customers';
+import { getCustomer, getCustomerStats } from '@/api/customers';
 import { getReceivablesForCustomer } from '@/api/dues';
+import { listPaymentsForCustomer } from '@/api/payments';
 
 import { ContactActions } from './contact-actions';
+import { PaymentTimeline } from './payment-timeline';
+
+type OutstandingInfoKey = 'total' | 'overdue' | 'txns';
 
 export default function CustomerDetailView() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [outInfo, setOutInfo] = useState<OutstandingInfoKey | null>(null);
 
   const customerQ = useQuery({
     queryKey: QK.customers.detail(id ?? ''),
@@ -31,6 +38,16 @@ export default function CustomerDetailView() {
   const salesQ = useQuery({
     queryKey: QK.dues.customer(id ?? ''),
     queryFn: () => getReceivablesForCustomer(id!),
+    enabled: !!id,
+  });
+  const statsQ = useQuery({
+    queryKey: QK.customers.stats(id ?? ''),
+    queryFn: () => getCustomerStats(id!),
+    enabled: !!id,
+  });
+  const paymentsQ = useQuery({
+    queryKey: QK.payments.byCustomer(id ?? ''),
+    queryFn: () => listPaymentsForCustomer(id!),
     enabled: !!id,
   });
 
@@ -111,26 +128,144 @@ export default function CustomerDetailView() {
           <ContactActions phone={customer?.phone ?? null} />
         </Card>
 
+        {/* Lifetime KPI grid */}
+        {statsQ.data && (
+          <View>
+            <View style={styles.sectionLabelRow}>
+              <Ionicons name="stats-chart" size={14} color={colors.textSecondary} />
+              <ThemedText type="overline" color={colors.textSecondary}>LIFETIME STATS</ThemedText>
+            </View>
+            <KpiGrid
+              items={
+                [
+                  {
+                    label: 'Lifetime spent',
+                    value: fmtRupee(statsQ.data.lifetime_spent),
+                    icon: 'cash-outline',
+                    accent: colors.primary500,
+                    accentBg: colors.primary50,
+                    description:
+                      'Total amount this customer has spent at the shop across every sale, including partial and unpaid amounts.',
+                    rawValue: statsQ.data.lifetime_spent,
+                  },
+                  {
+                    label: 'Visits',
+                    value: String(statsQ.data.visit_count),
+                    icon: 'repeat-outline',
+                    accent: colors.info,
+                    accentBg: colors.infoBg,
+                    description:
+                      'Number of separate sales recorded for this customer. Each recorded sale counts as one visit.',
+                    rawValue: statsQ.data.visit_count,
+                    isCurrency: false,
+                  },
+                  {
+                    label: 'Avg ticket',
+                    value: fmtRupee(statsQ.data.avg_ticket),
+                    icon: 'receipt-outline',
+                    accent: colors.success,
+                    accentBg: colors.successBg,
+                    description:
+                      'Average amount per sale for this customer (lifetime spent ÷ visits). Higher means they buy bigger every trip.',
+                    rawValue: statsQ.data.avg_ticket,
+                  },
+                  {
+                    label: 'Last visit',
+                    value: statsQ.data.last_visit_at
+                      ? fmtKarachi(statsQ.data.last_visit_at, 'dd MMM yyyy')
+                      : '—',
+                    icon: 'time-outline',
+                    accent: colors.warning,
+                    accentBg: colors.warningBg,
+                    description: statsQ.data.last_visit_at
+                      ? 'Date and time of the most recent sale recorded for this customer.'
+                      : 'No sales have been recorded for this customer yet.',
+                    // Display-only tile — no exact-value block needed for a
+                    // date. Omitting rawValue/isCurrency hides the number
+                    // section in the modal.
+                    isCurrency: false,
+                    rawValue: 0,
+                  },
+                ] as KpiItem[]
+              }
+            />
+          </View>
+        )}
+
         {/* Totals card */}
         <Card>
           <ThemedText type="h4" style={{ marginBottom: spacing[3] }}>Outstanding</ThemedText>
           <View style={styles.totalsGrid}>
-            <View style={[styles.totalCell, { borderLeftColor: colors.primary500 }]}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => setOutInfo('total')}
+              style={[styles.totalCell, { borderLeftColor: colors.primary500 }]}
+            >
               <ThemedText type="overline" color={colors.textTertiary}>TOTAL DUE</ThemedText>
-              <ThemedText type="numeric" color={colors.textPrimary}>{fmtCurrency(totals.total)}</ThemedText>
-            </View>
-            <View style={[styles.totalCell, { borderLeftColor: totals.overdue > 0 ? colors.danger : colors.success }]}>
-              <ThemedText type="overline" color={colors.textTertiary}>OVERDUE</ThemedText>
-              <ThemedText type="numeric" color={totals.overdue > 0 ? colors.danger : colors.success}>
-                {fmtCurrency(totals.overdue)}
+              <ThemedText type="h4" color={colors.textPrimary} numberOfLines={1} adjustsFontSizeToFit>
+                {fmtRupeeCompact(totals.total)}
               </ThemedText>
-            </View>
-            <View style={[styles.totalCell, { borderLeftColor: colors.info }]}>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => setOutInfo('overdue')}
+              style={[styles.totalCell, { borderLeftColor: totals.overdue > 0 ? colors.danger : colors.success }]}
+            >
+              <ThemedText type="overline" color={colors.textTertiary}>OVERDUE</ThemedText>
+              <ThemedText
+                type="h4"
+                color={totals.overdue > 0 ? colors.danger : colors.success}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {fmtRupeeCompact(totals.overdue)}
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => setOutInfo('txns')}
+              style={[styles.totalCell, { borderLeftColor: colors.info }]}
+            >
               <ThemedText type="overline" color={colors.textTertiary}>TXNS</ThemedText>
-              <ThemedText type="numeric" color={colors.textPrimary}>{totals.count}</ThemedText>
-            </View>
+              <ThemedText type="h4" color={colors.textPrimary} numberOfLines={1}>
+                {totals.count}
+              </ThemedText>
+            </TouchableOpacity>
           </View>
         </Card>
+
+        {/* Info modals for the Outstanding cells */}
+        <StatInfoModal
+          visible={outInfo === 'total'}
+          onClose={() => setOutInfo(null)}
+          label="Total Due"
+          description="Total amount this customer still owes you across every sale that hasn't been fully paid yet."
+          value={totals.total}
+          icon="cash-outline"
+          accentColor={colors.primary500}
+          accentBg={colors.primary50}
+        />
+        <StatInfoModal
+          visible={outInfo === 'overdue'}
+          onClose={() => setOutInfo(null)}
+          label="Overdue"
+          description="Portion of the total that has already passed its due date. Follow up on these first."
+          value={totals.overdue}
+          icon="alert-circle-outline"
+          accentColor={totals.overdue > 0 ? colors.danger : colors.success}
+          accentBg={totals.overdue > 0 ? colors.dangerBg : colors.successBg}
+        />
+        <StatInfoModal
+          visible={outInfo === 'txns'}
+          onClose={() => setOutInfo(null)}
+          label="Transactions"
+          description="Number of separate sales to this customer that still have an unpaid balance."
+          value={totals.count}
+          isCurrency={false}
+          icon="receipt-outline"
+          accentColor={colors.info}
+          accentBg={colors.infoBg}
+        />
 
         {/* Unpaid sales */}
         <View>
@@ -152,6 +287,15 @@ export default function CustomerDetailView() {
             </View>
           )}
         </View>
+
+        {/* Payment history (all-time, across every sale to this customer) */}
+        <Card>
+          <View style={styles.sectionLabelRow}>
+            <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
+            <ThemedText type="overline" color={colors.textSecondary}>PAYMENT HISTORY</ThemedText>
+          </View>
+          <PaymentTimeline payments={paymentsQ.data ?? []} />
+        </Card>
       </ScrollView>
     </View>
   );
@@ -182,7 +326,7 @@ function UnpaidSaleCard({ sale }: { sale: any }) {
         <View style={{ flex: 1, gap: 2 }}>
           <ThemedText type="h4" numberOfLines={1}>{sale.products?.name ?? 'Sale'}</ThemedText>
           <ThemedText type="caption" color={colors.textTertiary}>
-            {format(parseISO(sale.sold_at), 'dd MMM yyyy')} · {sale.quantity} unit{sale.quantity === 1 ? '' : 's'}
+            {fmtKarachi(sale.sold_at, 'dd MMM yyyy')} · {sale.quantity} unit{sale.quantity === 1 ? '' : 's'}
           </ThemedText>
         </View>
         <PaymentStatusBadge status={sale.payment_status} overdue={overdue} compact />
@@ -191,16 +335,16 @@ function UnpaidSaleCard({ sale }: { sale: any }) {
       <View style={styles.amountsRow}>
         <View style={styles.amountCell}>
           <ThemedText type="caption" color={colors.textTertiary}>Total</ThemedText>
-          <ThemedText type="numericSm" color={colors.textPrimary}>{fmtCurrency(total)}</ThemedText>
+          <ThemedText type="numericSm" color={colors.textPrimary}>{fmtRupeeCompact(total)}</ThemedText>
         </View>
         <View style={styles.amountCell}>
           <ThemedText type="caption" color={colors.textTertiary}>Paid</ThemedText>
-          <ThemedText type="numericSm" color={colors.success}>{fmtCurrency(paid)}</ThemedText>
+          <ThemedText type="numericSm" color={colors.success}>{fmtRupeeCompact(paid)}</ThemedText>
         </View>
         <View style={styles.amountCell}>
           <ThemedText type="caption" color={colors.textTertiary}>Balance</ThemedText>
           <ThemedText type="numericSm" color={overdue ? colors.danger : colors.textPrimary}>
-            {fmtCurrency(balance)}
+            {fmtRupeeCompact(balance)}
           </ThemedText>
         </View>
       </View>
@@ -214,7 +358,7 @@ function UnpaidSaleCard({ sale }: { sale: any }) {
           />
           <ThemedText type="caption" color={overdue ? colors.danger : colors.textSecondary}>
             {overdue ? 'Overdue since ' : 'Due '}
-            {format(parseISO(sale.due_date), 'dd MMM yyyy')}
+            {fmtKarachi(sale.due_date, 'dd MMM yyyy')}
           </ThemedText>
         </View>
       )}
@@ -271,9 +415,11 @@ const styles = StyleSheet.create({
   },
   contactList: { gap: spacing[2] },
   contactRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
-  totalsGrid: { flexDirection: 'row', gap: spacing[2] },
+  totalsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   totalCell: {
-    flex: 1,
+    flexBasis: '30%',
+    flexGrow: 1,
+    minWidth: 100,
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[3],
     borderRadius: radius.md,
@@ -282,6 +428,12 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   sectionLabel: { marginBottom: spacing[3], color: colors.textSecondary },
+  sectionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginBottom: spacing[3],
+  },
   emptyInline: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2] },
   saleHead: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginBottom: spacing[3] },
   amountsRow: { flexDirection: 'row', gap: spacing[2], marginBottom: spacing[3] },

@@ -5,15 +5,15 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
 
 import { ThemedText } from '@/components/themed-text';
+import { fmtKarachi, nowKarachiISO } from '@/lib/datetime';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DatePickerField } from '@/components/ui/date-picker-field';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
-import { fmtCurrency } from '@/lib/format-num';
+import { fmtCurrency, fmtRupeeCompact } from '@/lib/format-num';
 import { paymentSchema, type PaymentFormValues } from '@/types/app';
 import { recordPayment } from '@/api/payments';
 import { QK } from '@/constants/query-keys';
@@ -36,7 +36,9 @@ export default function RecordPaymentView() {
       resolver: zodResolver(paymentSchema) as any,
       defaultValues: {
         amount: maxAmount,
-        paid_at: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+        // Karachi-stamped ISO so Postgres timestamptz round-trips as the
+        // actual local moment, not UTC-misinterpreted.
+        paid_at: nowKarachiISO(),
         method: 'cash',
         note: '',
       } as any,
@@ -117,7 +119,7 @@ export default function RecordPaymentView() {
                   keyboardType="numeric"
                   value={String(field.value ?? '')}
                   onChangeText={field.onChange}
-                  error={errors.amount?.message ?? (overMax ? `Cannot exceed ${fmtCurrency(maxAmount)}` : undefined)}
+                  error={errors.amount?.message ?? (overMax ? `Cannot exceed ${fmtRupeeCompact(maxAmount)}` : undefined)}
                   leftIcon={<ThemedText type="caption" color={colors.textTertiary}>₨</ThemedText>}
                 />
               )}
@@ -135,7 +137,7 @@ export default function RecordPaymentView() {
                     activeOpacity={0.7}
                   >
                     <ThemedText type="caption" color={colors.primary600}>
-                      {frac === 1 ? 'Full' : `${frac * 100}%`} · {fmtCurrency(amt)}
+                      {frac === 1 ? 'Full' : `${frac * 100}%`} · {fmtRupeeCompact(amt)}
                     </ThemedText>
                   </TouchableOpacity>
                 );
@@ -145,15 +147,24 @@ export default function RecordPaymentView() {
             <Controller
               control={control}
               name="paid_at"
-              render={({ field }) => (
-                <DatePickerField
-                  label="Paid on"
-                  value={field.value ? field.value.split('T')[0] : null}
-                  onChange={(v) => field.onChange(v ? `${v}T${format(new Date(), 'HH:mm:ss')}` : '')}
-                  placeholder="Pick a date"
-                  maximumDate={new Date()}
-                />
-              )}
+              render={({ field }) => {
+                // Preserve the time + Karachi offset already stored on the
+                // field so picking "yesterday" doesn't have its clock silently
+                // overwritten with the current time. Fall back to current
+                // Karachi time only when no time has been chosen yet.
+                const currentTime = field.value?.includes('T')
+                  ? field.value.split('T')[1]
+                  : nowKarachiISO().split('T')[1];
+                return (
+                  <DatePickerField
+                    label="Paid on"
+                    value={field.value ? field.value.split('T')[0] : null}
+                    onChange={(v) => field.onChange(v ? `${v}T${currentTime}` : '')}
+                    placeholder="Pick a date"
+                    maximumDate={new Date()}
+                  />
+                );
+              }}
             />
 
             <Controller
@@ -184,7 +195,7 @@ export default function RecordPaymentView() {
           </Card>
 
           <Button
-            label={`Record ${fmtCurrency(amountNum)}`}
+            label={`Record ${fmtRupeeCompact(amountNum)}`}
             onPress={handleSubmit(onSubmit)}
             loading={mutation.isPending}
             disabled={overMax || amountNum <= 0}

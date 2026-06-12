@@ -34,6 +34,10 @@ export default function AppLayout() {
       <Stack.Screen name="purchase/[id]" />
       <Stack.Screen name="customer/[id]" />
       <Stack.Screen name="supplier/[id]" />
+      <Stack.Screen name="customers/index" />
+      <Stack.Screen name="suppliers/index" />
+      <Stack.Screen name="add-customer" options={{ presentation: "modal" }} />
+      <Stack.Screen name="add-supplier" options={{ presentation: "modal" }} />
       <Stack.Screen name="record-payment" options={{ presentation: "modal" }} />
     </Stack>
   );

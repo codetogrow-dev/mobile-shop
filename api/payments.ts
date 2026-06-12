@@ -40,3 +40,60 @@ export async function deletePayment(id: string): Promise<void> {
   const { error } = await supabase.from('payments').delete().eq('id', id);
   if (error) throw error;
 }
+
+/**
+ * All payments made by a single customer, across all their sales.
+ * Two-step lookup: fetch the customer's sale IDs, then their payments.
+ */
+export async function listPaymentsForCustomer(customerId: string): Promise<Payment[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: sales, error: salesErr } = await supabase
+    .from('sales')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('customer_id', customerId);
+  if (salesErr) throw salesErr;
+
+  const saleIds = (sales ?? []).map((s) => s.id);
+  if (saleIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('transaction_type', 'sale')
+    .in('transaction_id', saleIds)
+    .order('paid_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Payment[];
+}
+
+/**
+ * All payments made to a single supplier, across all their purchase batches.
+ */
+export async function listPaymentsForSupplier(supplierId: string): Promise<Payment[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: batches, error: batchErr } = await supabase
+    .from('purchase_batches')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('supplier_id', supplierId);
+  if (batchErr) throw batchErr;
+
+  const batchIds = (batches ?? []).map((b) => b.id);
+  if (batchIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('transaction_type', 'purchase')
+    .in('transaction_id', batchIds)
+    .order('paid_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Payment[];
+}

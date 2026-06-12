@@ -1,10 +1,10 @@
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { format, parseISO } from 'date-fns';
 
 import { ThemedText } from '@/components/themed-text';
 import { colors, spacing, radius } from '@/constants/theme';
 import { fmtCurrency } from '@/lib/format-num';
+import { fmtKarachi } from '@/lib/datetime';
 import type { Payment } from '@/types/app';
 
 interface Props {
@@ -36,7 +36,7 @@ export function PaymentTimeline({ payments }: Props) {
                 {fmtCurrency(Number(p.amount))}
               </ThemedText>
               <ThemedText type="caption" color={colors.textTertiary}>
-                {format(parseISO(p.paid_at), 'dd MMM yyyy')}
+                {fmtKarachi(p.paid_at, 'dd MMM yyyy · hh:mm a')}
               </ThemedText>
             </View>
             <View style={styles.meta}>

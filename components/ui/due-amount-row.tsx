@@ -1,12 +1,13 @@
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { format, parseISO, differenceInCalendarDays } from 'date-fns';
+import { parseISO, differenceInCalendarDays } from 'date-fns';
 
 import { ThemedText } from '@/components/themed-text';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { colors, spacing, radius } from '@/constants/theme';
-import { fmtCurrency } from '@/lib/format-num';
+import { fmtCurrency, fmtRupeeCompact } from '@/lib/format-num';
+import { fmtKarachi } from '@/lib/datetime';
 
 interface Props {
   name: string;
@@ -70,7 +71,7 @@ export function DueAmountRow({
               <View style={styles.metaItem}>
                 <Ionicons name="calendar-outline" size={11} color={colors.textTertiary} />
                 <ThemedText type="caption" color={colors.textTertiary}>
-                  due {format(parseISO(oldestDueDate), 'd MMM')}
+                  due {fmtKarachi(oldestDueDate, 'd MMM')}
                 </ThemedText>
               </View>
             )}
@@ -83,7 +84,7 @@ export function DueAmountRow({
           </ThemedText>
           {isOverdue && overdueAmount < totalDue && (
             <ThemedText type="caption" color={colors.danger}>
-              {fmtCurrency(overdueAmount)} overdue
+              {fmtRupeeCompact(overdueAmount)} overdue
             </ThemedText>
           )}
         </View>

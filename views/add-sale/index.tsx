@@ -6,9 +6,9 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
 
 import { ThemedText } from '@/components/themed-text';
+import { nowKarachiISO } from '@/lib/datetime';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -58,7 +58,9 @@ export default function AddSaleView() {
         product_id: '',
         quantity: 1,
         sale_price_per_unit: 0,
-        sold_at: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+        // Karachi-stamped ISO so Postgres timestamptz stores the real local
+        // moment regardless of the device timezone.
+        sold_at: nowKarachiISO(),
         payment_mode: PAYMENT_MODE.FULL,
         customer_id: null,
         due_date: null,

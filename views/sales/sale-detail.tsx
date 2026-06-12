@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { fmtKarachi, todayKarachi } from '@/lib/datetime';
 
 import { ThemedText } from '@/components/themed-text';
 import { Input } from '@/components/ui/input';
@@ -89,10 +90,11 @@ export default function SaleDetailView() {
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: QK.sales.all });
     qc.invalidateQueries({ queryKey: QK.sales.detail(id) });
+    qc.invalidateQueries({ queryKey: QK.payments.byTransaction('sale', id) });
     qc.invalidateQueries({ queryKey: QK.products.all });
-    qc.invalidateQueries({ queryKey: QK.reports.daily(format(new Date(), 'yyyy-MM-dd')) });
+    qc.invalidateQueries({ queryKey: QK.reports.daily(todayKarachi()) });
     qc.invalidateQueries({ queryKey: QK.reports.weeklyRevenue });
-    qc.invalidateQueries({ queryKey: QK.reports.topProducts(format(new Date(), 'yyyy-MM-dd')) });
+    qc.invalidateQueries({ queryKey: QK.reports.topProducts(todayKarachi()) });
     if (sale?.product_id) {
       qc.invalidateQueries({ queryKey: QK.sales.byProduct(sale.product_id) });
       qc.invalidateQueries({ queryKey: QK.reports.product(sale.product_id) });
@@ -139,7 +141,7 @@ export default function SaleDetailView() {
           <View style={{ flex: 1 }}>
             <ThemedText type="h3" numberOfLines={1}>{sale.products?.name ?? 'Sale'}</ThemedText>
             <ThemedText type="caption" color={colors.textSecondary}>
-              {format(new Date(sale.sold_at), 'dd MMM yyyy · hh:mm a')}
+              {fmtKarachi(sale.sold_at, 'dd MMM yyyy · hh:mm a')}
             </ThemedText>
           </View>
           {!editing && (
@@ -219,6 +221,22 @@ export default function SaleDetailView() {
                   </>
                 ) : null}
               </View>
+
+              {/* Payment & Dues card */}
+              <PaymentDuesCard
+                sale={sale}
+                payments={payments ?? []}
+                onRecordPayment={() =>
+                  router.push({
+                    pathname: '/(app)/record-payment',
+                    params: {
+                      transactionType: 'sale',
+                      transactionId: id,
+                      maxAmount: String(Number(sale.balance_due ?? 0)),
+                    },
+                  })
+                }
+              />
 
               {/* Product info */}
               <View style={styles.card}>
@@ -309,6 +327,114 @@ export default function SaleDetailView() {
   );
 }
 
+function PaymentDuesCard({
+  sale,
+  payments,
+  onRecordPayment,
+}: {
+  sale: any;
+  payments: any[];
+  onRecordPayment: () => void;
+}) {
+  const total       = Number(sale.total_revenue ?? 0);
+  const paid        = Number(sale.amount_paid ?? 0);
+  const balance     = Number(sale.balance_due ?? 0);
+  const status      = (sale.payment_status as 'paid' | 'partial' | 'unpaid' | null) ?? null;
+  const dueDate     = sale.due_date ? parseISO(sale.due_date) : null;
+  const today       = new Date(new Date().toDateString());
+  const overdue     = balance > 0 && !!dueDate && dueDate < today;
+  const customer    = sale.customers ?? null;
+
+  return (
+    <View style={styles.card}>
+      {/* Header */}
+      <View style={styles.duesHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+          <Ionicons name="wallet-outline" size={16} color={colors.textSecondary} />
+          <ThemedText type="h4">Payment & Dues</ThemedText>
+        </View>
+        {status && <PaymentStatusBadge status={status} overdue={overdue} />}
+      </View>
+
+      <Divider />
+      <DetailRow icon="cash-outline" label="Total Revenue" value={fmtCurrency(total)} />
+      <Divider />
+      <DetailRow icon="checkmark-circle-outline" label="Paid" value={fmtCurrency(paid)} valueColor={colors.success} />
+      <Divider />
+      <DetailRow
+        icon="alert-circle-outline"
+        label="Balance Due"
+        value={fmtCurrency(balance)}
+        valueColor={balance > 0 ? colors.danger : colors.success}
+      />
+      {dueDate && (
+        <>
+          <Divider />
+          <DetailRow
+            icon="calendar-outline"
+            label={overdue ? 'Overdue since' : 'Due Date'}
+            value={fmtKarachi(dueDate, 'dd MMM yyyy')}
+            valueColor={overdue ? colors.danger : colors.textPrimary}
+          />
+        </>
+      )}
+
+      {/* Customer sub-section */}
+      {customer && (
+        <>
+          <Divider />
+          <TouchableOpacity
+            onPress={() => router.push(`/(app)/customer/${customer.id}` as any)}
+            activeOpacity={0.7}
+          >
+            <DetailRow icon="person-outline" label="Customer" value={customer.name} valueColor={colors.primary500} />
+          </TouchableOpacity>
+          {customer.phone ? (
+            <>
+              <Divider />
+              <DetailRow icon="call-outline" label="Phone" value={customer.phone} />
+            </>
+          ) : null}
+          {customer.cnic ? (
+            <>
+              <Divider />
+              <DetailRow icon="card-outline" label="CNIC" value={customer.cnic} />
+            </>
+          ) : null}
+          {customer.address ? (
+            <>
+              <Divider />
+              <DetailRow icon="location-outline" label="Address" value={customer.address} />
+            </>
+          ) : null}
+          <View style={styles.contactActionsWrap}>
+            <ContactActions phone={customer.phone ?? null} />
+          </View>
+        </>
+      )}
+
+      {/* Record-payment CTA */}
+      {balance > 0 && (
+        <View style={styles.recordBtnWrap}>
+          <Button
+            label={`Record Payment (${fmtCurrency(balance)} remaining)`}
+            onPress={onRecordPayment}
+            fullWidth
+          />
+        </View>
+      )}
+
+      {/* Payment history */}
+      <View style={styles.timelineWrap}>
+        <ThemedText type="overline" color={colors.textTertiary} style={{ marginBottom: spacing[2] }}>
+          PAYMENTS
+        </ThemedText>
+        <PaymentTimeline payments={payments} />
+      </View>
+    </View>
+  );
+}
+
 function StatCard({ label, value, color, onPress }: { label: string; value: string; color: string; onPress?: () => void }) {
   return (
     <TouchableOpacity style={styles.statCard} onPress={onPress} activeOpacity={0.75}>
@@ -379,4 +505,14 @@ const styles = StyleSheet.create({
   rowDivider: { height: 1, backgroundColor: colors.border, marginHorizontal: spacing[4] },
   editForm: { gap: spacing[4] },
   editActions: { flexDirection: 'row', gap: spacing[3], marginTop: spacing[2] },
+  duesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+  },
+  contactActionsWrap: { paddingHorizontal: spacing[4], paddingVertical: spacing[3] },
+  recordBtnWrap:      { paddingHorizontal: spacing[4], paddingTop: spacing[3] },
+  timelineWrap:       { paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[4] },
 });

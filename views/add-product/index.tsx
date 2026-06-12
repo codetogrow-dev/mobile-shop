@@ -1,22 +1,29 @@
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
+import { Controller, useForm } from "react-hook-form";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ThemedText } from '@/components/themed-text';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { CategoryPicker } from '@/components/ui/category-picker';
-import { colors, spacing, radius, shadows } from '@/constants/theme';
-import { productSchema, type ProductFormValues } from '@/types/app';
-import { createProduct } from '@/api/products';
-import { listCategories } from '@/api/categories';
-import { QK } from '@/constants/query-keys';
-import { useAuthStore } from '@/store/auth-store';
+import { listCategories } from "@/api/categories";
+import { createProduct } from "@/api/products";
+import { ThemedText } from "@/components/themed-text";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { CategoryPicker } from "@/components/ui/category-picker";
+import { Input } from "@/components/ui/input";
+import { QK } from "@/constants/query-keys";
+import { colors, radius, shadows, spacing } from "@/constants/theme";
+import { useAuthStore } from "@/store/auth-store";
+import { productSchema, type ProductFormValues } from "@/types/app";
 
 export default function AddProductView() {
   const insets = useSafeAreaInsets();
@@ -28,16 +35,25 @@ export default function AddProductView() {
     queryFn: listCategories,
   });
 
-  const { control, handleSubmit, formState: { errors }, watch, setValue } = useForm<ProductFormValues, any, ProductFormValues>({
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+    watch,
+    setValue,
+  } = useForm<ProductFormValues, any, ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
-    defaultValues: { name: '', unit: 'piece', reorder_point: 5 },
+    defaultValues: { name: "", unit: "piece", reorder_point: 5 },
   });
 
-  const selectedCategoryId = watch('category_id');
+  const selectedCategoryId = watch("category_id");
 
   const mutation = useMutation({
     mutationFn: (values: ProductFormValues) =>
-      createProduct({ ...values, tenant_id: (user as any)?.user_metadata?.tenant_id ?? user?.id ?? '' }),
+      createProduct({
+        ...values,
+        tenant_id: (user as any)?.user_metadata?.tenant_id ?? user?.id ?? "",
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.products.all });
       router.back();
@@ -45,29 +61,40 @@ export default function AddProductView() {
   });
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+          >
             <Ionicons name="close" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
           <ThemedText type="h3">Add Product</ThemedText>
           <View style={{ width: 36 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
           {mutation.error && (
             <View style={styles.errorBanner}>
               <Ionicons name="alert-circle" size={16} color={colors.danger} />
               <ThemedText type="caption" color={colors.danger}>
-                {(mutation.error as any)?.message ?? 'Failed to add product'}
+                {(mutation.error as any)?.message ?? "Failed to add product"}
               </ThemedText>
             </View>
           )}
 
           {/* ── Basic Info ── */}
           <Card>
-            <ThemedText type="h4" style={styles.sectionTitle}>Basic Info</ThemedText>
+            <ThemedText type="h4" style={styles.sectionTitle}>
+              Basic Info
+            </ThemedText>
 
             <Controller
               control={control}
@@ -90,7 +117,7 @@ export default function AddProductView() {
                 <Input
                   label="SKU / Item Code"
                   placeholder="Optional — e.g. IP15-COVER-BLK"
-                  value={field.value ?? ''}
+                  value={field.value ?? ""}
                   onChangeText={field.onChange}
                   error={errors.sku?.message}
                 />
@@ -104,9 +131,15 @@ export default function AddProductView() {
                 <Input
                   label="Barcode"
                   placeholder="Scan or type barcode number"
-                  value={field.value ?? ''}
+                  value={field.value ?? ""}
                   onChangeText={field.onChange}
-                  rightIcon={<Ionicons name="scan-outline" size={18} color={colors.primary500} />}
+                  rightIcon={
+                    <Ionicons
+                      name="scan-outline"
+                      size={18}
+                      color={colors.primary500}
+                    />
+                  }
                 />
               )}
             />
@@ -120,7 +153,7 @@ export default function AddProductView() {
                   placeholder="Any extra details about this product"
                   multiline
                   numberOfLines={3}
-                  value={field.value ?? ''}
+                  value={field.value ?? ""}
                   onChangeText={field.onChange}
                 />
               )}
@@ -129,75 +162,22 @@ export default function AddProductView() {
 
           {/* ── Category ── */}
           <Card>
-            <ThemedText type="h4" style={styles.sectionTitle}>Category</ThemedText>
+            <ThemedText type="h4" style={styles.sectionTitle}>
+              Category
+            </ThemedText>
             <CategoryPicker
               categories={categories ?? []}
               selectedId={selectedCategoryId}
-              onSelect={(id) => setValue('category_id', id)}
+              onSelect={(id) => setValue("category_id", id)}
               error={errors.category_id?.message}
-            />
-          </Card>
-
-          {/* ── Opening Stock & Pricing ── */}
-          <Card>
-            <ThemedText type="h4" style={styles.sectionTitle}>Opening Stock & Pricing</ThemedText>
-            <ThemedText type="caption" color={colors.textSecondary} style={styles.sectionHint}>
-              Fill all three fields to record your existing stock as the first purchase batch.
-              You can always add more stock later via Add Purchase.
-            </ThemedText>
-
-            <Controller
-              control={control}
-              name="initial_stock"
-              render={({ field }) => (
-                <Input
-                  label="Current Stock (units you have now)"
-                  placeholder="e.g. 20"
-                  keyboardType="numeric"
-                  value={String(field.value ?? '')}
-                  onChangeText={field.onChange}
-                  error={errors.initial_stock?.message}
-                  leftIcon={<Ionicons name="cube-outline" size={18} color={colors.textTertiary} />}
-                />
-              )}
-            />
-
-            <Controller
-              control={control}
-              name="purchase_price"
-              render={({ field }) => (
-                <Input
-                  label="Purchase Price (what you paid per unit)"
-                  placeholder="e.g. 450"
-                  keyboardType="numeric"
-                  value={String(field.value ?? '')}
-                  onChangeText={field.onChange}
-                  error={errors.purchase_price?.message}
-                  leftIcon={<Ionicons name="arrow-down-circle-outline" size={18} color={colors.textTertiary} />}
-                />
-              )}
-            />
-
-            <Controller
-              control={control}
-              name="sale_price"
-              render={({ field }) => (
-                <Input
-                  label="Sale Price (what you charge customers)"
-                  placeholder="e.g. 650"
-                  keyboardType="numeric"
-                  value={String(field.value ?? '')}
-                  onChangeText={field.onChange}
-                  error={errors.sale_price?.message}
-                  leftIcon={<Ionicons name="arrow-up-circle-outline" size={18} color={colors.textTertiary} />}
-                />
-              )}
             />
           </Card>
 
           {/* ── Stock Settings ── */}
           <Card>
-            <ThemedText type="h4" style={styles.sectionTitle}>Stock Settings</ThemedText>
+            <ThemedText type="h4" style={styles.sectionTitle}>
+              Stock Settings
+            </ThemedText>
 
             <Controller
               control={control}
@@ -221,10 +201,16 @@ export default function AddProductView() {
                   label="Low Stock Warning At"
                   placeholder="e.g. 5 — you'll be alerted when stock hits this"
                   keyboardType="numeric"
-                  value={String(field.value ?? '')}
+                  value={String(field.value ?? "")}
                   onChangeText={field.onChange}
                   error={errors.reorder_point?.message}
-                  leftIcon={<Ionicons name="warning-outline" size={18} color={colors.textTertiary} />}
+                  leftIcon={
+                    <Ionicons
+                      name="warning-outline"
+                      size={18}
+                      color={colors.textTertiary}
+                    />
+                  }
                 />
               )}
             />
@@ -246,9 +232,9 @@ export default function AddProductView() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing[5],
     paddingVertical: spacing[4],
     backgroundColor: colors.bgCard,
@@ -259,8 +245,8 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 36,
     height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 18,
     backgroundColor: colors.bgElevated,
   },
@@ -272,8 +258,8 @@ const styles = StyleSheet.create({
   sectionTitle: { marginBottom: spacing[1] },
   sectionHint: { marginBottom: spacing[3], lineHeight: 18 },
   errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing[2],
     backgroundColor: colors.dangerBg,
     borderRadius: radius.md,

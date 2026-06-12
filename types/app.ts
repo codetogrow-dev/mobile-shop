@@ -307,6 +307,66 @@ export interface TopProduct {
   revenue: number;
 }
 
+// ─── Customer / Supplier stats & pagination ──────────────────────────────────
+
+export type PartyListSort = 'name' | 'spent' | 'visits' | 'recent' | 'balance';
+
+export interface CustomerListRow extends Party {
+  lifetime_spent:   number;
+  visit_count:      number;
+  avg_ticket:       number;
+  last_visit_at:    string | null;
+  current_balance:  number;
+}
+
+export interface SupplierListRow extends Party {
+  lifetime_purchased: number;
+  batch_count:        number;
+  avg_batch:          number;
+  last_purchase_at:   string | null;
+  current_balance:    number;
+}
+
+export interface CustomerStats {
+  customer_id:     string;
+  lifetime_spent:  number;
+  visit_count:     number;
+  avg_ticket:      number;
+  last_visit_at:   string | null;
+  current_balance: number;
+}
+
+export interface SupplierStats {
+  supplier_id:        string;
+  lifetime_purchased: number;
+  batch_count:        number;
+  avg_batch:          number;
+  last_purchase_at:   string | null;
+  current_balance:    number;
+}
+
+export interface CustomersDashboardSummary {
+  customers_today:    number;
+  new_this_month:     number;
+  top_customer_id:    string | null;
+  top_customer_name:  string | null;
+  top_customer_total: number;
+}
+
+export interface SuppliersDashboardSummary {
+  active_today:       number;
+  new_this_month:     number;
+  top_supplier_id:    string | null;
+  top_supplier_name:  string | null;
+  top_supplier_total: number;
+}
+
+export interface PartyListPage<T> {
+  rows: T[];
+  total_count: number;
+  next_offset: number | null;
+}
+
 // ─── Dues ────────────────────────────────────────────────────────────────────
 
 export interface DuesPartySummary {

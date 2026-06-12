@@ -2,11 +2,12 @@ import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { format, parseISO, differenceInCalendarDays } from 'date-fns';
+import { parseISO, differenceInCalendarDays } from 'date-fns';
 
 import { ThemedText } from '@/components/themed-text';
 import { colors, spacing, radius, shadows } from '@/constants/theme';
-import { fmtCurrency } from '@/lib/format-num';
+import { fmtRupeeCompact } from '@/lib/format-num';
+import { fmtKarachi } from '@/lib/datetime';
 import { QK } from '@/constants/query-keys';
 import { getOverduePeople } from '@/api/dues';
 
@@ -77,13 +78,13 @@ export function OverdueBanner() {
                 {p.name}
               </ThemedText>
               <ThemedText type="numeric" color={colors.danger}>
-                {fmtCurrency(p.overdue_amount)}
+                {fmtRupeeCompact(p.overdue_amount)}
               </ThemedText>
               <View style={styles.metaRow}>
                 <Ionicons name="time-outline" size={11} color={colors.textTertiary} />
                 <ThemedText type="caption" color={colors.textTertiary} numberOfLines={1}>
                   {p.oldest_due_date
-                    ? `${daysOver}d · ${format(parseISO(p.oldest_due_date), 'dd MMM')}`
+                    ? `${daysOver}d · ${fmtKarachi(p.oldest_due_date, 'dd MMM')}`
                     : 'overdue'}
                 </ThemedText>
               </View>
